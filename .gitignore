@@ -1,0 +1,8 @@
+venv/
+__pycache__/
+*.egg-info/
+parsetab.py
+.cache/
+.pytest_cache/
+.coverage
+htmlcov/

@@ -1,0 +1,15 @@
+#!/bin/sh
+
+BINDIR="$(dirname "${BASH_SOURCE[0]}")"
+LIBDIR="$BINDIR"/../lib
+. "$LIBDIR/common.bash"
+. "$LIBDIR/do_submit.bash"
+
+job_manager_hook || exit
+
+CWD=$1
+shift
+OUTDIR=$1
+shift
+
+do_submit "$@"

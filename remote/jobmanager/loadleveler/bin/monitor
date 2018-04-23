@@ -1,0 +1,40 @@
+#!/usr/bin/perl
+
+use strict;
+use POSIX ":sys_wait_h";
+
+my ($jobid, $outdir, $status, $exitcode) = @ARGV;
+
+$jobid =~ /(.*)\..*/;
+$jobid = $1;
+
+my $decoded_exitcode = 0;
+my $mystatus;
+
+if ($status eq "JOB_COMPLETED") {
+    if (WIFEXITED($exitcode)) {
+        $decoded_exitcode = WEXITSTATUS($exitcode);
+    } elsif (WIFSIGNALED($exitcode)) {
+        $decoded_exitcode = -WTERMSIG($exitcode);
+    } else {
+        $decoded_exitcode = 1;
+    }
+
+    if ($decoded_exitcode == 0) {
+        $mystatus = "COMPLETED";
+    } else {
+        $mystatus = "FAIL_EXIT_CODE";
+    }
+} elsif ($status eq "JOB_STARTED") {
+    $mystatus = "RUNNING";
+} elsif ($status eq "JOB_VACATED" || $status eq "JOB_REJECTED") {
+    $mystatus = "SUBMITTED";
+} elsif ($status eq "JOB_REMOVED" || $status eq "JOB_NOTRUN") {
+    $mystatus = "FAIL_EXTERNAL";
+} else {
+    $mystatus = "UNKNOWN";
+}
+
+open OUTFILE, ">$outdir/$jobid.status" or die;
+print OUTFILE "$mystatus|$decoded_exitcode";
+close OUTFILE;

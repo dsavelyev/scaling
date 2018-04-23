@@ -1,0 +1,11 @@
+#!/bin/bash
+
+STATUSDIR="$HOME/.scaling-status"
+
+while read -r jobid; do
+    echo -n "$jobid|"
+    FILE="$STATUSDIR/$jobid.status"
+    [ ! -f "$FILE" ] && echo -n "SUBMITTED|0"  # FIXME
+    cat "$FILE" 2>/dev/null
+    echo
+done

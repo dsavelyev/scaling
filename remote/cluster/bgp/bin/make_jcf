@@ -1,0 +1,74 @@
+#!/usr/bin/perl
+
+use strict;
+use File::Basename;
+use File::Temp qw/ tempfile /;
+use Cwd 'abs_path';
+
+my %factors = ( "smp" => 1, "dual" => 2, "vn" => 4 );
+
+my @sizes = (32, 64, 128, 256, 512, 1024, 2048);
+my @classes = ("n32_m15", "n64_m15", "n128_m15", "n256_m10", "n512_m05", "n1024_m03", "n2048_m03");
+my @wall_clock_limits = ("00:15:00", "00:15:00", "00:15:00", "00:10:00", "00:05:00", "00:03:00", "00:03:00");
+
+my $debug = 0;
+if($ARGV[0] eq "debug") {
+    print STDERR "Debug mode\n";
+    $debug = 1;
+    shift @ARGV;
+}
+
+my $cwd = shift @ARGV;
+my $outdir = shift @ARGV;
+
+my $nprocs = shift @ARGV;
+my $mode = shift @ARGV;
+my $executable = shift @ARGV;
+
+my $nodes;
+{
+    use integer;
+    my $factor = $factors{$mode};
+    $nodes = $nprocs / $factor;
+    if ($nprocs % $factor > 0) {
+        $nodes++;
+    }
+}
+
+my $i;
+for ($i = 0; $i <= $#sizes && $sizes[$i] < $nodes; $i++) {}
+$i <= $#sizes or die "too many processes specified";
+my $bg_size = $sizes[$i];
+my $class = $classes[$i];
+my $wall_clock_limit = $wall_clock_limits[$i];
+
+my $fh; my $filename;
+
+if (!$debug) {
+    ($fh, $filename) = tempfile();
+    select $fh;
+} else {
+    $fh = \*STDERR;
+}
+
+print "#@ job_type = bluegene\n";
+print "#@ bg_size = ", $bg_size, "\n";
+print "#@ wall_clock_limit = ", $wall_clock_limit, "\n";
+print "#@ class = ", $class, "\n";
+print "#@ initialdir = ", $cwd, "\n";
+print "#@ output = ", $outdir, '/$(host).$(domain).$(jobid).out', "\n";
+print "#@ error = ", $outdir, '/$(host).$(domain).$(jobid).err', "\n";
+print "#@ queue\n";
+
+print "/bgsys/drivers/ppcfloor/bin/mpirun";
+print " -np " , $nprocs;
+print " -mode " , $mode;
+print " -exe ", $executable;
+print " -args '", join(" ", @ARGV), "'";
+print "\n";
+
+print STDERR "JCF written to $filename\n";
+close $fh;
+
+select STDOUT;
+print "$filename\n";

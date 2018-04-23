@@ -1,0 +1,19 @@
+#!/bin/bash
+
+BINDIR="$(dirname "${BASH_SOURCE[0]}")"
+LIBDIR="$BINDIR"/../lib
+. "$LIBDIR/common.bash"
+
+job_manager_hook
+
+EXIT_CODE=0
+
+do_scancel() {
+    scancel "$@"
+    if [ $? -ne 0 ]; then
+        EXIT_CODE=$?
+    fi
+}
+
+bash_xargs do_scancel
+exit $EXIT_CODE
