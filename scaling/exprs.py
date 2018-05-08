@@ -1,4 +1,5 @@
 import operator
+import re
 from collections import namedtuple
 from functools import partial
 
@@ -63,8 +64,10 @@ class ParamSpecParser:
         return t
 
     def t_STRING(self, t):
-        r'"(?P<contents>(?:\\"|[^\\"])*)"'
-        t.value = t.lexer.lexmatch.group('contents').replace(r'\"', '"')
+        r'"(?P<contents>(?:\\"|\\\\|[^\\"])*)"'
+        contents = t.lexer.lexmatch.group('contents')
+        contents = re.sub(r'\\(\\|")', lambda match: match.group(1), contents)
+        t.value = contents
         return t
 
     ident_regex = r'[A-Za-z_][A-Za-z0-9_]*'

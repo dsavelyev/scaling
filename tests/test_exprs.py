@@ -117,3 +117,14 @@ def test_parser6():
     params6 = se.gen_params(spec6)
     with pytest.raises(StopIteration):
         next(params6)
+
+def test_parser7():
+    spec7 = r'''
+    x: "\"";
+    y: "\\";
+    z: "\\\"\\a";
+    '''
+
+    strings = next(se.gen_params(spec7))
+    res = {'x': '"', 'y': '\\', 'z': r'\"\a'}
+    assert strings == res
