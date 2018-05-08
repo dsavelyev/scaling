@@ -1,6 +1,7 @@
 # TODO: error reporting infrastructure
 # TODO: stop depending on sympy
 
+import itertools
 import math
 
 import sympy
@@ -10,11 +11,15 @@ import toolz
 from mpmath.libmp import isqrt
 
 
+class FunctionError:
+    pass
+
+
 def ilog_floor(x, b):
     if not isinstance(x, int) or not isinstance(b, int):
-        raise TypeError('ilog_floor: unsupported argument type')
+        raise FunctionError('ilog_floor: unsupported argument type')
     if x < 1 or b < 1:
-        raise ValueError('ilog_floor: x < 1 or b < 1')
+        raise FunctionError('ilog_floor: x < 1 or b < 1')
 
     ret = -1
     while x >= 1:
@@ -25,9 +30,9 @@ def ilog_floor(x, b):
 
 def ilog_ceil(x, b):
     if not isinstance(x, int) or not isinstance(b, int):
-        raise TypeError('ilog_ceil: unsupported argument type')
+        raise FunctionError('ilog_ceil: unsupported argument type')
     if x < 1 or b < 1:
-        raise ValueError('ilog_ceil: x < 1 or b < 1')
+        raise FunctionError('ilog_ceil: x < 1 or b < 1')
     elif x == 1:
         return 0
     else:
@@ -35,10 +40,11 @@ def ilog_ceil(x, b):
 
 
 def multipartitions(x, count, incl_ones):
-    if not isinstance(x, int) or not isinstance(count, int):
-        raise TypeError('multipartitions: unsupported argument type')
+    if not isinstance(x, int) or not isinstance(count, int)\
+        or not isinstance(incl_ones, int):
+        raise FunctionError('multipartitions: unsupported argument type')
     if x <= 0 or count <= 0:
-        raise ValueError('multipartitions: x and count must be positive')
+        raise FunctionError('multipartitions: x and count must be positive')
 
     primes, multiplicities = zip(*sympy.factorint(x).items())
     mtp = sue.MultisetPartitionTraverser()
@@ -59,17 +65,17 @@ def multipartitions(x, count, incl_ones):
 
 def isqrt_floor(x):
     if not isinstance(x, int):
-        raise TypeError('isqrt: unsupported argument type')
+        raise FunctionError('isqrt: unsupported argument type')
     if x < 0:
-        raise ValueError('isqrt: x < 0')
+        raise FunctionError('isqrt: x < 0')
     return isqrt(x)
 
 
 def isqrt_ceil(x):
     if not isinstance(x, int):
-        raise TypeError('isqrt: unsupported argument type')
+        raise FunctionError('isqrt: unsupported argument type')
     if x < 0:
-        raise ValueError('isqrt: x < 0')
+        raise FunctionError('isqrt: x < 0')
     elif x == 0:
         return 0
     else:
@@ -82,25 +88,39 @@ def our_range(*args):
     elif 2 <= len(args) <= 3:
         start, stop, step = args[0], args[1], args[2] if len(args) == 3 else 1
     else:
-        raise ValueError('range: wrong number of arguments')
+        raise FunctionError('range: wrong number of arguments')
+
+    if any(not isinstance(x, int) for x in (start, stop, step)):
+        raise FunctionError('range: arguments must be ints')
 
     return range(start, stop + 1, step)
 
 
-# the lambdas are to prevent any surprises re the API
+def reraise_exc(func):
+    def inner(*args, **kwargs):
+        try:
+            func(*args, **kwargs)
+        except Exception as e:
+            raise FunctionError(str(e))
+
+    return inner
+
+
 builtin_funcs = {
     'range': our_range,
     'multipartitions': multipartitions,
     'isqrt_floor': isqrt_floor,
     'isqrt_ceil': isqrt_ceil,
-    'sqrt': lambda x: math.sqrt(x),
-    'log': lambda x, base: math.log(x, base),
+    'sqrt': reraise_exc(lambda x: math.sqrt(x)),
+    'log': reraise_exc(lambda x, base: math.log(x, base)),
     'ilog_floor': ilog_floor,
     'ilog_ceil': ilog_ceil,
-    'floor': lambda x: int(math.floor(x)),
-    'ceil': lambda x: int(math.ceil(x)),
-    'round': lambda x: int(round(x)),
-    'int': lambda x: int(x),
-    'float': lambda x: float(x),
-    'zip': lambda *args: zip(*args)
+    'floor': reraise_exc(lambda x: int(math.floor(x))),
+    'ceil': reraise_exc(lambda x: int(math.ceil(x))),
+    'round': reraise_exc(lambda x: int(round(x))),
+    'int': reraise_exc(lambda x: int(x)),
+    'float': reraise_exc(lambda x: float(x)),
+    'str': reraise_exc(lambda x: str(x)),
+    'zip': reraise_exc(lambda *args: zip(*args)),
+    'concat': reraise_exc(lambda *args: itertools.chain(*args)),
 }

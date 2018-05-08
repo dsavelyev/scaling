@@ -8,7 +8,7 @@ import ply.lex as lex
 import ply.yacc as yacc
 from toposort import toposort_flatten
 
-from .functions import builtin_funcs
+from .functions import builtin_funcs, FunctionError
 
 BinOp = namedtuple('BinOp', ['lhs', 'op', 'rhs'])
 UnOp = namedtuple('UnOp', ['op', 'inner'])
@@ -177,10 +177,6 @@ class ParamSpecParser:
         raise ParamSpecError('Syntax error near token {0}'.format(t))
 
 
-def _generate_tables():
-    ParamSpecParser()
-
-
 _binopfuncs = {
     '+': operator.add,
     '-': operator.sub,
@@ -286,7 +282,11 @@ def gen_params(param_spec):
     expr_keys = set()
 
     psp = ParamSpecParser()
-    asts = psp.parse(param_spec)
+
+    try:
+        asts = psp.parse(param_spec)
+    except FunctionError as e:
+        raise ParamSpecError(str(e))
 
     for identlist, expr in asts.items():
         for ident in identlist:

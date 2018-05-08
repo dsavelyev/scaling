@@ -128,3 +128,17 @@ def test_parser7():
     strings = next(se.gen_params(spec7))
     res = {'x': '"', 'y': '\\', 'z': r'\"\a'}
     assert strings == res
+
+def test_parser8():
+    spec8 = r'''
+    x: concat([1], range(4, 5));
+    '''
+
+    names = ('x')
+    res8 = sorted([
+        (1,),
+        (4,),
+        (5,),
+    ])
+
+    assert check_names_and_sort_dicts(se.gen_params(spec8), names) == res8

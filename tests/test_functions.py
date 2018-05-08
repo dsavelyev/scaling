@@ -19,3 +19,10 @@ def test_isqrt():
 
     assert sf.isqrt_floor(38) == 6
     assert sf.isqrt_ceil(38) == 7
+
+
+def test_concat():
+    assert list(sf.builtin_funcs['concat'](
+        [1], [2, 3],
+        sf.builtin_funcs['range'](3),
+        [42])) == [1, 2, 3, 1, 2, 3, 42]
