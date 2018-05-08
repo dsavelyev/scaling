@@ -1,18 +1,20 @@
 import argparse
 import csv
 import functools
+import getpass
 import logging
 import os
 import re
 import sys
+import time
 
 import attr
 import pytoml
-from .launch import MachineSpec, LaunchProfile, ProgSpec, OutFileSpec, InFileSpec, LaunchSpec,\
-    InFileCreationSpec, OutputSpec, JobState, JobStateType, Result, gen_launch_specs, run_experiment, parse_outputs,\
-    types as _param_types, SpecError
+from . import launch
 from .exprs import gen_params, ParamSpecParser, ParamSpecError
-from .machine import SSHMachine
+from .machine import SSHMachine, PasswordRequiredException
+from . import jobs
+from .util import handle_sigint, poll_keyboard
 
 
 _logger = logging.getLogger(__name__)
@@ -74,7 +76,7 @@ def get_outfilespec(ofs, fname):
 
     outputspecs = list(map(functools.partial(get_outputspec, fname=fname),
                        ofs['outputspecs']))
-    return OutFileSpec(ofs['name'], outputspecs)
+    return launch.OutFileSpec(ofs['name'], outputspecs)
 
 
 _outputspec_schema = {
@@ -87,7 +89,7 @@ def get_outputspec(spec, fname):
     _validate_schema(spec, _outputspec_schema, fname)
     _validate_param_types(spec['vartypes'], fname)
 
-    return OutputSpec(spec['vartypes'], spec['regex'])
+    return launch.OutputSpec(spec['vartypes'], spec['regex'])
 
 
 def _validate_param_types(params, fname):
@@ -98,7 +100,7 @@ def _validate_param_types(params, fname):
         if not re.match(ParamSpecParser.ident_regex, k):
             raise ConfigError(
                 f'{fname}: parameter {k} is not a valid identifier')
-        if v not in _param_types:
+        if v not in launch.types:
             raise ConfigError(
                 f'{fname}: parameter {k}: {v} is not one of int, float, str')
 
@@ -114,7 +116,7 @@ def load_machine_spec(file):
     d = _toml_from_file(file)
     _validate_schema(d, _machine_spec_schema, file.name)
 
-    return MachineSpec(**d)
+    return launch.MachineSpec(**d)
 
 
 _launch_profile_schema = {
@@ -141,7 +143,7 @@ def load_launch_profile(file):
 
     d['out_file_specs'] = list(map(functools.partial(get_outfilespec, fname=file.name), d['out_file_specs']))
 
-    return LaunchProfile(**d)
+    return launch.LaunchProfile(**d)
 
 
 _infilespec_schema = {
@@ -156,7 +158,7 @@ def get_infilespec(d, fname):
     with _open_file(d['template'], fname) as f:
         template = f.read()
 
-    return InFileSpec(d['name'], template)
+    return launch.InFileSpec(d['name'], template)
 
 
 _prog_spec_schema = {
@@ -180,7 +182,7 @@ def load_prog_spec(file):
     d['out_file_specs'] = list(map(functools.partial(get_outfilespec, fname=file.name), d['out_file_specs']))
     d['in_file_specs'] = list(map(functools.partial(get_infilespec, fname=file.name), d['in_file_specs']))
 
-    return ProgSpec(**d)
+    return launch.ProgSpec(**d)
 
 
 def write_launch_specs(file, launch_profile_file, prog_spec_file, executable, launch_specs):
@@ -199,7 +201,7 @@ _infile_creation_spec_schema = {
 
 def get_infile_creation_spec(spec, fname):
     _validate_schema(spec, _infile_creation_spec_schema, fname)
-    return InFileCreationSpec(**spec)
+    return launch.InFileCreationSpec(**spec)
 
 
 _launch_spec_schema = {
@@ -231,7 +233,7 @@ def load_launch_specs(file):
     for d in obj['specs']:
         _validate_schema(d, _launch_spec_schema, file.name)
         ifcs = list(map(functools.partial(get_infile_creation_spec, fname=file.name), d['infiles']))
-        spec_list.append(LaunchSpec(d['args'], d['params'], ifcs))
+        spec_list.append(launch.LaunchSpec(d['args'], d['params'], ifcs))
 
     return launch_profile, prog_spec, obj['executable'], spec_list
 
@@ -258,8 +260,8 @@ _jobstate_schema = {
 def get_job_state(obj, fname):
     _validate_schema(obj, _jobstate_schema, fname)
 
-    status = JobStateType[obj['status']]
-    return JobState(status, obj['exit_code'])
+    status = launch.JobStateType[obj['status']]
+    return launch.JobState(status, obj['exit_code'])
 
 
 _result_schema = {
@@ -283,7 +285,7 @@ def load_results(file):
 
     for d in dlist:
         _validate_schema(d, _result_schema, file.name)
-        results[d['index']] = Result(d['jobid'],
+        results[d['index']] = launch.Result(d['jobid'],
                                      get_job_state(d['state'], file.name),
                                      d['cwd'])
 
@@ -321,15 +323,70 @@ def genparams(args):
         _logger.info(f'Number of runs: {len(params)}')
 
         try:
-            generator = gen_launch_specs(site_spec, prog_spec, params)
-        except SpecError as e:
+            generator = launch.gen_launch_specs(site_spec, prog_spec, params)
+        except launch.SpecError as e:
             raise UserError(str(e))
 
         write_launch_specs(args.launch_spec, args.launch_profile.name,
                 args.prog_spec.name, args.executable, generator)
 
 
-def launch(args):
+def get_machine(machine_spec):
+    password = None
+
+    while True:
+        try:
+            machine = SSHMachine(host=machine_spec.host,
+                                 port=machine_spec.port,
+                                 username=machine_spec.username,
+                                 password=password)
+        except PasswordRequiredException as e:
+            password = getpass.getpass()
+        else:
+            break
+
+    return machine
+
+
+def run_experiment(machine, scheduler, submitter):
+    submitter.start()
+    submitter.wait_alive()
+
+    interrupted = False
+    def sigint_handler(*args):
+        nonlocal interrupted
+        interrupted = True
+
+    # defer handling Ctrl-C until the thread is done
+    with handle_sigint(sigint_handler):
+        while submitter.is_alive():
+            key = poll_keyboard()
+            if interrupted or key in ('c', 'q'):
+                submitter.stop()
+                break
+            time.sleep(0.5)
+
+        submitter.join()
+
+    if interrupted:
+        raise KeyboardInterrupt
+
+    results = submitter.result()
+
+    jobids = [x[0] for x in results.values()]
+    if key == 'c':
+        _logger.info('Trying to cancel all submitted jobs')
+        try:
+            scheduler.cancel_jobs(jobids)
+        except SchedulerError as e:
+            _logger.error('Cancel failed')
+        else:
+            _logger.info('Cancel succeeded')
+
+    return results
+
+
+def do_launch(args):
     with unlink_on_exception(args.result_file):
         _logger.info('Parsing launch specs...')
         launch_profile, _, executable, launch_specs = load_launch_specs(args.launch_spec)
@@ -339,15 +396,39 @@ def launch(args):
         for k, v in throttles:
             throttledict[k] = int(v)
 
-        machine_spec = launch_profile.machine
+        paramdicts = [spec.params for spec in launch_specs]
+        try:
+            job_generator = launch.schedule_jobs(paramdicts, throttledict)
+        except launch.SpecError as e:
+            raise UserError(str(e))
 
-        results = run_experiment(machine_spec, launch_profile, executable, launch_specs, throttledict)
+        with get_machine(launch_profile.machine) as machine:
+            cwds, outdir = launch.create_experiment_inputs(machine, launch_profile, launch_specs)
 
-        if results is not None:
-            write_results(args.result_file, results)
+            jobspecs = []
+            for i, spec in enumerate(launch_specs):
+                exec_args = [executable]
+                exec_args.extend(spec.args)
 
-    if results is None:
-        os.unlink(args.result_file.name)
+                jobspecs.append(jobs.JobSpec(exec_args, spec.params, cwds[i]))
+
+            scheduler = jobs.RemoteScheduler(
+                machine,
+                launch_profile.start_cmd,
+                launch_profile.poll_cmd,
+                launch_profile.cancel_cmd,
+                launch_profile.param_order,
+                outdir,
+                poll_interval=15)
+            with scheduler:
+                submitter = launch.ThrottlingSubmitter(scheduler, jobspecs,
+                        launch.schedule_jobs(paramdicts, throttledict))
+
+                raw_results = run_experiment(machine, scheduler, submitter)
+
+        results = {index: launch.Result(jobid, state, cwds[index])
+                   for index, (jobid, state) in raw_results.items()}
+        write_results(args.result_file, results)
 
 
 def getoutputs(args):
@@ -359,7 +440,7 @@ def getoutputs(args):
         machine_spec = launch_profile.machine
 
         _logger.info('Downloading and parsing outputs...')
-        fieldnames, out = parse_outputs(machine_spec, launch_profile, prog_spec, launch_specs, results)
+        fieldnames, out = launch.parse_outputs(machine_spec, launch_profile, prog_spec, launch_specs, results)
 
         _logger.info('Writing CSV...')
         dw = csv.DictWriter(args.out, fieldnames)
@@ -394,7 +475,7 @@ def main():
         required=False, default=[])
     parser_launch.add_argument(
         '-o', '--result-file', type=argparse.FileType('w'), required=True)
-    parser_launch.set_defaults(func=launch)
+    parser_launch.set_defaults(func=do_launch)
 
     parser_getoutputs = subparsers.add_parser('getoutputs')
     parser_getoutputs.add_argument(

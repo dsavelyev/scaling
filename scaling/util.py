@@ -75,6 +75,7 @@ class RepeatingTimerThread:
 
     def stop(self):
         self.evt.set()
+        self.thrd.join()
 
 
 def poll_keyboard_windows():
