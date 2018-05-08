@@ -422,6 +422,9 @@ def main():
     except UserError as e:
         _logger.exception(str(e))
         sys.exit(1)
+    except KeyboardInterrupt:
+        _logger.exception('Interrupted by user')
+        sys.exit(1)
 
 if __name__ == '__main__':
     main()

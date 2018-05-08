@@ -2,11 +2,13 @@ import fnmatch
 import logging
 import os.path
 from string import Template
+import time
 
 import attr
-from .jobs import JobSpec, JobState, JobStateType, RemoteScheduler, ThrottlingSubmitter, SchedulerError
+from .jobs import JobSpec, JobState, JobStateType, RemoteScheduler, ThrottlingSubmitter, SchedulerError, schedule_jobs
 from .grok import Grok
 from .machine import SSHMachine
+from .util import poll_keyboard, handle_sigint
 
 
 _logger = logging.getLogger(__name__)
@@ -170,29 +172,42 @@ def run_experiment(machine, launch_profile, executable, launch_specs, throttles)
 
             paramdicts.append(spec.params)
 
-        submitter = None
-        jobids = None
-        results = None
-        try:
-            submitter = ThrottlingSubmitter(scheduler, jobspecs, paramdicts,
-                                            throttles)
+        submitter = ThrottlingSubmitter(scheduler, jobspecs, schedule_jobs(
+            paramdicts, throttles))
 
-            results = submitter.result()
+        submitter.start()
+        submitter.wait_alive()
 
-        except KeyboardInterrupt:
-            if submitter is not None:
-                _logger.info('Stopping')
-                submitter.stop()
-                results = submitter.result()
+        interrupted = False
+        def sigint_handler(*args):
+            nonlocal interrupted
+            interrupted = True
 
-                try:
-                    _logger.info('Trying to cancel all submitted jobs')
-                    scheduler.cancel_jobs(jobids)
-                except SchedulerError:
-                    _logger.info('Cancel failed')
-                    pass
-                else:
-                    _logger.info('Cancel succeeded')
+        # defer handling Ctrl-C until the thread is done
+        with handle_sigint(sigint_handler):
+            while submitter.is_alive():
+                key = poll_keyboard()
+                if interrupted or key in ('c', 'q'):
+                    submitter.stop()
+                    break
+                time.sleep(0.5)
+
+            submitter.join()
+
+        if interrupted:
+            raise KeyboardInterrupt
+
+        results = submitter.result()
+
+        jobids = [x[0] for x in results.values()]
+        if key == 'c':
+            _logger.info('Trying to cancel all submitted jobs')
+            try:
+                scheduler.cancel_jobs(jobids)
+            except SchedulerError as e:
+                _logger.error('Cancel failed')
+            else:
+                _logger.info('Cancel succeeded')
 
         ret = {}
         for index, (jobid, state) in results.items():

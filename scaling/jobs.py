@@ -194,6 +194,10 @@ def schedule_jobs(paramdicts, throttles):
     of values of the parameter `key` in jobspecs never exceeds `value` at any given point
     in time. The jobs that have completed are given to the generator using send().
     '''
+    for p in paramdicts:
+        if any(throttles.get(k) is not None and p[k] > throttles[k]
+               for k in p):
+            raise ValueError
 
     throttle_vars = {}
     for name, value in throttles.items():
@@ -223,22 +227,18 @@ def schedule_jobs(paramdicts, throttles):
         yield batch
 
 
-class ThrottlingSubmitter:
+class ThrottlingSubmitter(threading.Thread):
     def __init__(self,
                  scheduler,
                  jobspecs,
-                 paramdicts,
-                 throttles,
+                 generator,
                  attempt_interval=15,
                  max_attempts_fail_external=10):
-        for p in paramdicts:
-            if any(
-                    throttles.get(k) is not None and p[k] > throttles[k]
-                    for k in p):
-                raise ValueError
+        super().__init__()
 
-        self._q = queue.PriorityQueue()
+        self._q = queue.Queue()
         self._evt = threading.Event()
+        self._alive_evt = threading.Event()
         self._done = False
 
         self._schedobj = sched.scheduler()
@@ -246,7 +246,7 @@ class ThrottlingSubmitter:
 
         self._scheduler = scheduler
         self._jobspecs = jobspecs
-        self._generator = schedule_jobs(paramdicts, throttles)
+        self._generator = generator
 
         self._attempt_interval = attempt_interval
         self._max_attempts_fail_external = max_attempts_fail_external
@@ -258,15 +258,22 @@ class ThrottlingSubmitter:
         self._attempt_counts = [0] * len(jobspecs)
         self._num_pending = len(jobspecs)
 
-        self._future = self._tpe.submit(self._thread_body)
+        self._results = None
 
     def stop(self):
         self._fire_event('STOP')
 
-    def result(self, timeout=None):
-        return self._future.result(timeout)
+    def result(self):
+        if self.is_alive():
+            raise RuntimeError('thread is alive')
+        return self._results
 
-    def _thread_body(self):
+    def wait_alive(self):
+        self._alive_evt.wait()
+
+    def run(self):
+        self._alive_evt.set()
+
         self._batch = queue.deque(self._generator.send(None))
         _logger.debug(f'Received batch {self._batch}')
         self._schedule_next_submit()
@@ -279,11 +286,9 @@ class ThrottlingSubmitter:
             else:
                 _logger.info('Done')
 
-        results = {}
+        self._results = {}
         for jobid, jobindex in self._jobids.items():
-            results[jobindex] = (jobid, self._jobstates[jobindex])
-
-        return results
+            self._results[jobindex] = (jobid, self._jobstates[jobindex])
 
     def _listener(self, jobid, state):
         self._fire_event((jobid, state))
