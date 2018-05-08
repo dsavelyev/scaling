@@ -279,13 +279,11 @@ class ThrottlingSubmitter:
             else:
                 _logger.info('Done')
 
-        jobids = [None] * len(self._jobspecs)
-        results = [None] * len(self._jobspecs)
+        results = {}
         for jobid, jobindex in self._jobids.items():
-            jobids[jobindex] = jobid
-            results[jobindex] = self._jobstates[jobindex]
+            results[jobindex] = (jobid, self._jobstates[jobindex])
 
-        return jobids, results
+        return results
 
     def _listener(self, jobid, state):
         self._fire_event((jobid, state))

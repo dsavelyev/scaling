@@ -238,8 +238,9 @@ def load_launch_specs(file):
 
 def write_results(file, results):
     ret = []
-    for res in results:
+    for index, res in results.items():
         ret.append({
+            'index': index,
             'jobid': str(res.jobid),
             'state': {'status': res.state.status.name, 'exit_code': res.state.exit_code},
             'cwd': res.cwd
@@ -262,6 +263,7 @@ def get_job_state(obj, fname):
 
 
 _result_schema = {
+    'index': (int, None),
     'jobid': (str, None),
     'state': (dict, None),
     'cwd': (str, None)
@@ -277,15 +279,15 @@ def load_results(file):
     except KeyError:
         raise ConfigError('invalid result spec')
 
-    reslist = []
+    results = {}
 
     for d in dlist:
         _validate_schema(d, _result_schema, file.name)
-        reslist.append(Result(d['jobid'],
-                              get_job_state(d['state'], file.name),
-                              d['cwd']))
+        results[d['index']] = Result(d['jobid'],
+                                     get_job_state(d['state'], file.name),
+                                     d['cwd'])
 
-    return reslist
+    return results
 
 
 class unlink_on_exception:

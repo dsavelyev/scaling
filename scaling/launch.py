@@ -177,15 +177,13 @@ def run_experiment(machine, launch_profile, executable, launch_specs, throttles)
             submitter = ThrottlingSubmitter(scheduler, jobspecs, paramdicts,
                                             throttles)
 
-            # aaaand go!
-            jobids, results = submitter.result()
+            results = submitter.result()
 
         except KeyboardInterrupt:
             if submitter is not None:
                 _logger.info('Stopping')
                 submitter.stop()
-                jobids, results = submitter.result()
-                jobids = filter(lambda x: x is not None, jobids)
+                results = submitter.result()
 
                 try:
                     _logger.info('Trying to cancel all submitted jobs')
@@ -195,11 +193,11 @@ def run_experiment(machine, launch_profile, executable, launch_specs, throttles)
                     pass
                 else:
                     _logger.info('Cancel succeeded')
-                return None
 
-        ret = []
-        for jobid, result, cwd in zip(jobids, results, cwds):
-            ret.append(Result(jobid, result, cwd))
+        ret = {}
+        for index, (jobid, state) in results.items():
+            ret[index] = Result(jobid, state, cwds[index])
+
         return ret
 
 
@@ -269,8 +267,16 @@ def parse_outputs(machine_spec, launch_profile, prog_spec, launch_specs,
             for k in all_output_keys:
                 result[k] = None
 
-            job_result = results[index]
-            if job_result.state.status != JobStateType.COMPLETED:
+            no_result = False
+            try:
+                job_result = results[index]
+            except KeyError:
+                no_result = True
+            else:
+                if job_result.state.status != JobStateType.COMPLETED:
+                    no_result = True
+
+            if no_result:
                 ret.append(result)
                 continue
 
