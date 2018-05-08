@@ -17,9 +17,6 @@ from . import jobs
 from .util import handle_sigint, poll_keyboard
 
 
-_logger = logging.getLogger(__name__)
-
-
 class LogFormatter(logging.Formatter):
     def format(self, record):
         return f'[{record.name}] {record.getMessage()}'
@@ -320,7 +317,7 @@ def genparams(args):
             raise UserError(str(e))
 
         params = list(params)
-        _logger.info(f'Number of runs: {len(params)}')
+        print(f'Number of runs: {len(params)}', file=sys.stderr)
 
         try:
             generator = launch.gen_launch_specs(site_spec, prog_spec, params)
@@ -375,20 +372,20 @@ def run_experiment(machine, scheduler, submitter):
 
     jobids = [x[0] for x in results.values()]
     if key == 'c':
-        _logger.info('Trying to cancel all submitted jobs')
+        print('Trying to cancel all submitted jobs', file=sys.stderr)
         try:
             scheduler.cancel_jobs(jobids)
         except SchedulerError as e:
-            _logger.error('Cancel failed')
+            print('Cancel failed', file=sys.stderr)
         else:
-            _logger.info('Cancel succeeded')
+            print('Cancel succeeded', file=sys.stderr)
 
     return results
 
 
 def do_launch(args):
     with unlink_on_exception(args.result_file):
-        _logger.info('Parsing launch specs...')
+        print('Parsing launch specs...', file=sys.stderr)
         launch_profile, _, executable, launch_specs = load_launch_specs(args.launch_spec)
         throttles = args.throttle
 
@@ -433,16 +430,16 @@ def do_launch(args):
 
 def getoutputs(args):
     with unlink_on_exception(args.out):
-        _logger.info('Parsing launch specs...')
+        print('Parsing launch specs...', file=sys.stderr)
         launch_profile, prog_spec, _, launch_specs = load_launch_specs(args.launch_spec)
-        _logger.info('Parsing results...')
+        print('Parsing results...', file=sys.stderr)
         results = load_results(args.result_file)
         machine_spec = launch_profile.machine
 
-        _logger.info('Downloading and parsing outputs...')
+        print('Downloading and parsing outputs...', file=sys.stderr)
         fieldnames, out = launch.parse_outputs(machine_spec, launch_profile, prog_spec, launch_specs, results)
 
-        _logger.info('Writing CSV...')
+        print('Writing CSV...', file=sys.stderr)
         dw = csv.DictWriter(args.out, fieldnames)
         dw.writeheader()
         dw.writerows(out)
@@ -501,10 +498,10 @@ def main():
     try:
         args.func(args)
     except UserError as e:
-        _logger.exception(str(e))
+        print(str(e), file=sys.stderr)
         sys.exit(1)
     except KeyboardInterrupt:
-        _logger.exception('Interrupted by user')
+        print('Interrupted by user', file=sys.stderr)
         sys.exit(1)
 
 if __name__ == '__main__':

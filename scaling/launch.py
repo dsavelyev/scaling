@@ -281,7 +281,7 @@ class ThrottlingSubmitter(threading.Thread):
                     _logger.error(f'{jobid} failed {self._max_attempts_fail_external} times, will not resubmit')
                 return
 
-            _logger.info(f'{jobid} aka {index} done, final state = {state}')
+            _logger.info(f'{jobid} aka {index} done')
             self._num_pending -= 1
             if not self._num_pending:
                 _logger.debug('All jobs done, exiting from handle_event')
