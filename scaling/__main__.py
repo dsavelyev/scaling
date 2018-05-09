@@ -336,9 +336,9 @@ def get_machine(machine_spec):
             machine = SSHMachine(host=machine_spec.host,
                                  port=machine_spec.port,
                                  username=machine_spec.username,
-                                 password=password)
+                                 passphrase=password)
         except PasswordRequiredException as e:
-            password = getpass.getpass()
+            password = getpass.getpass('Private key passphrase: ')
         else:
             break
 

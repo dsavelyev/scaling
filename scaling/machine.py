@@ -53,16 +53,13 @@ class LocalMachine:
         raise NotImplementedError
 
 
-class PasswordRequiredException:
-    def __init__(self, msg):
-        self.msg = msg
-
-    def __str__(self):
-        return self.msg
+class PasswordRequiredException(Exception):
+    pass
 
 
 class SSHMachine:
-    def __init__(self, host, port=22, username=None, pkey=None, password=None):
+    def __init__(self, host, port=22, username=None, pkey=None, password=None,
+                 passphrase=None):
         self.client = paramiko.SSHClient()
         self.client.load_system_host_keys()
         self.client.set_missing_host_key_policy(paramiko.WarningPolicy())
@@ -73,7 +70,8 @@ class SSHMachine:
                 port=port,
                 username=username,
                 pkey=pkey,
-                password=password)
+                password=password,
+                passphrase=passphrase)
         except paramiko.PasswordRequiredException as e:
             raise PasswordRequiredException(str(e))
 
