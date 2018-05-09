@@ -439,6 +439,8 @@ def main():
     parser.add_argument('-d', '--debug', help='enable debug logging', action='store_true')
 
     subparsers = parser.add_subparsers()
+    subparsers.required = True
+    subparsers.dest = 'command'
 
     parser_genparams = subparsers.add_parser('genparams')
     parser_genparams.add_argument(
