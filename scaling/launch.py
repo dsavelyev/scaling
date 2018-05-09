@@ -343,7 +343,7 @@ def get_file_from_glob(machine, dirname, glob_pattern):
 # TODO: rewrite
 def parse_outputs(machine, launch_profile, prog_spec, launch_specs,
                   results):
-    def update_result(result, machine, dirname, fname, spec, exact_file=False):
+    def update_result(result, dirname, fname, spec, exact_file=False):
         try:
             _logger.debug(f'Trying to get {dirname}/{fname}')
             if exact_file:
@@ -411,13 +411,13 @@ def parse_outputs(machine, launch_profile, prog_spec, launch_specs,
         rundir = job_result.cwd
 
         for spec in prog_spec.out_file_specs:
-            update_result(result, machine, rundir, spec.name,
+            update_result(result, rundir, spec.name,
                           spec.outputspecs)
         for spec in launch_profile.out_file_specs:
-            update_result(result, machine, rundir, spec.name,
+            update_result(result, rundir, spec.name,
                           spec.outputspecs)
         update_result(
-            result, machine,
+            result,
             f'{launch_profile.base_dir}/out', f'{job_result.jobid}.out',
             prog_spec.stdout, True)
 
