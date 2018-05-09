@@ -343,6 +343,9 @@ def run_experiment(machine, scheduler, submitter):
     # defer handling Ctrl-C until the thread is done
     with stdin_noecho():
         with handle_sigint(sigint_handler):
+            print('Press [q] or Ctrl-C to quit, [c] to quit and cancel all '
+                  'jobs', file=sys.stderr)
+
             while submitter.is_alive():
                 key = poll_keyboard()
                 if interrupted or key in ('c', 'q'):
