@@ -7,9 +7,9 @@ LIBDIR="$BINDIR"/../lib
 
 job_manager_hook || exit
 
-CWD=$1
+CWD="$1"
 shift
-OUTDIR=$1
+OUTDIR="$1"
 shift
 
 do_submit "$@"
