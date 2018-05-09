@@ -14,7 +14,7 @@ from . import launch
 from .exprs import gen_params, ParamSpecParser, ParamSpecError
 from .machine import SSHMachine, PasswordRequiredException
 from . import jobs
-from .util import handle_sigint, poll_keyboard
+from .util import handle_sigint, poll_keyboard, stdin_noecho
 
 
 class LogFormatter(logging.Formatter):
@@ -355,15 +355,17 @@ def run_experiment(machine, scheduler, submitter):
         interrupted = True
 
     # defer handling Ctrl-C until the thread is done
-    with handle_sigint(sigint_handler):
-        while submitter.is_alive():
-            key = poll_keyboard()
-            if interrupted or key in ('c', 'q'):
-                submitter.stop()
-                break
-            time.sleep(0.5)
+    with stdin_noecho():
+        with handle_sigint(sigint_handler):
+            while submitter.is_alive():
+                key = poll_keyboard()
+                if interrupted or key in ('c', 'q'):
+                    print('Stopping')
+                    submitter.stop()
+                    break
+                time.sleep(0.5)
 
-        submitter.join()
+            submitter.join()
 
     if interrupted:
         raise KeyboardInterrupt

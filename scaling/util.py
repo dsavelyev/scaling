@@ -78,40 +78,43 @@ class RepeatingTimerThread:
         self.thrd.join()
 
 
-def poll_keyboard_windows():
-    if kbhit():
-        return getch()
-    else:
-        return None
-
-
-def poll_keyboard_unix():
-    if os.isatty(0):
-        old_params = termios.tcgetattr(0)
-        new_params = old_params[:]
-        new_params[3] &= ~(termios.ICANON | termios.ECHO)
-        new_params[6][termios.VMIN] = 0
-        new_params[6][termios.VTIME] = 0
-
-    try:
+class _stdin_noecho_unix:
+    def __enter__(self):
         if os.isatty(0):
+            self._old_params = termios.tcgetattr(0)
+            new_params = self._old_params[:]
+            new_params[3] &= ~(termios.ICANON | termios.ECHO)
+            new_params[6][termios.VMIN] = 0
+            new_params[6][termios.VTIME] = 0
+
             termios.tcsetattr(0, termios.TCSADRAIN, new_params)
 
+    def __exit__(self, *args):
+        if os.isatty(0):
+            termios.tcsetattr(0, termios.TCSADRAIN, self._old_params)
+
+
+if unix:
+    stdin_noecho = _stdin_noecho_unix
+
+    def poll_keyboard():
         ready, _, _ = select.select([0], [], [], 0)
         if 0 in ready:
             return sys.stdin.read(1)
         else:
             return None
-    finally:
-        if os.isatty(0):
-            termios.tcsetattr(0, termios.TCSADRAIN, old_params)
+else:
+    class stdin_noecho:
+        def __enter__(self):
+            pass
+        def __exit__(self, *args):
+            pass
 
-
-def poll_keyboard():
-    if unix:
-        return poll_keyboard_unix()
-    else:
-        return poll_keyboard_windows()
+    def poll_keyboard():
+        if kbhit():
+            return getch()
+        else:
+            return None
 
 
 class handle_sigint:
