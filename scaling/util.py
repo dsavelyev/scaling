@@ -100,7 +100,7 @@ if unix:
     def poll_keyboard():
         ready, _, _ = select.select([0], [], [], 0)
         if 0 in ready:
-            return sys.stdin.read(1)
+            return sys.stdin.buffer.read(1)
         else:
             return None
 else:
@@ -112,7 +112,11 @@ else:
 
     def poll_keyboard():
         if kbhit():
-            return getch()
+            ch = getch()
+            if ch in (b'\000', b'\xe0'):
+                getch()
+                return None
+            return ch
         else:
             return None
 

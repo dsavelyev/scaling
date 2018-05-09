@@ -348,7 +348,7 @@ def run_experiment(machine, scheduler, submitter):
 
             while submitter.is_alive():
                 key = poll_keyboard()
-                if interrupted or key in ('c', 'q'):
+                if interrupted or key in (b'c', b'q'):
                     print('Stopping', file=sys.stderr)
                     submitter.stop()
                     break
@@ -362,7 +362,7 @@ def run_experiment(machine, scheduler, submitter):
     results = submitter.result()
 
     jobids = [x[0] for x in results.values()]
-    if key == 'c':
+    if key == b'c':
         print('Trying to cancel all submitted jobs', file=sys.stderr)
         try:
             scheduler.cancel_jobs(jobids)
