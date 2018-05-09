@@ -343,10 +343,13 @@ def get_file_from_glob(machine, dirname, glob_pattern):
 # TODO: rewrite
 def parse_outputs(machine, launch_profile, prog_spec, launch_specs,
                   results):
-    def update_result(result, machine, dirname, fname, spec):
+    def update_result(result, machine, dirname, fname, spec, exact_file=False):
         try:
             _logger.debug(f'Trying to get {dirname}/{fname}')
-            data = get_file_from_glob(machine, dirname, fname)
+            if exact_file:
+                data = machine.get_file(f'{dirname}/{fname}')
+            else:
+                data = get_file_from_glob(machine, dirname, fname)
         except OSError:
             _logger.error(f'{dirname}/{fname}: file load failed')
         else:
@@ -416,7 +419,7 @@ def parse_outputs(machine, launch_profile, prog_spec, launch_specs,
         update_result(
             result, machine,
             f'{launch_profile.base_dir}/out', f'{job_result.jobid}.out',
-            prog_spec.stdout)
+            prog_spec.stdout, True)
 
         ret.append(result)
 
