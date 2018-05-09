@@ -436,10 +436,10 @@ def getoutputs(args):
         launch_profile, prog_spec, _, launch_specs = load_launch_specs(args.launch_spec)
         print('Parsing results...', file=sys.stderr)
         results = load_results(args.result_file)
-        machine_spec = launch_profile.machine
 
-        print('Downloading and parsing outputs...', file=sys.stderr)
-        fieldnames, out = launch.parse_outputs(machine_spec, launch_profile, prog_spec, launch_specs, results)
+        with get_machine(launch_profile.machine) as machine:
+            print('Downloading and parsing outputs...', file=sys.stderr)
+            fieldnames, out = launch.parse_outputs(machine, launch_profile, prog_spec, launch_specs, results)
 
         print('Writing CSV...', file=sys.stderr)
         dw = csv.DictWriter(args.out, fieldnames)

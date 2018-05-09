@@ -342,7 +342,7 @@ def get_file_from_glob(machine, dirname, glob_pattern):
 
 
 # TODO: rewrite
-def parse_outputs(machine_spec, launch_profile, prog_spec, launch_specs,
+def parse_outputs(machine, launch_profile, prog_spec, launch_specs,
                   results):
     def update_result(result, machine, dirname, fname, spec):
         try:
@@ -368,62 +368,57 @@ def parse_outputs(machine_spec, launch_profile, prog_spec, launch_specs,
 
                     result[key] = value
 
-    with SSHMachine(
-            host=machine_spec.host,
-            port=machine_spec.port,
-            username=machine_spec.username) as machine:
+    all_output_keys = set()
 
-        all_output_keys = set()
-
-        for outfilespec in launch_profile.out_file_specs:
-            for outspec in outfilespec.outputspecs:
-                all_output_keys.update(outspec.vartypes.keys())
-        for outfilespec in prog_spec.out_file_specs:
-            for outspec in outfilespec.outputspecs:
-                all_output_keys.update(outspec.vartypes.keys())
-        for outspec in prog_spec.stdout:
+    for outfilespec in launch_profile.out_file_specs:
+        for outspec in outfilespec.outputspecs:
             all_output_keys.update(outspec.vartypes.keys())
+    for outfilespec in prog_spec.out_file_specs:
+        for outspec in outfilespec.outputspecs:
+            all_output_keys.update(outspec.vartypes.keys())
+    for outspec in prog_spec.stdout:
+        all_output_keys.update(outspec.vartypes.keys())
 
-        _logger.debug(all_output_keys)
-        ret = []
+    _logger.debug(all_output_keys)
+    ret = []
 
-        for index, lspec in enumerate(launch_specs):
-            paramdict = lspec.params
-            paramkeys = paramdict.keys()
+    for index, lspec in enumerate(launch_specs):
+        paramdict = lspec.params
+        paramkeys = paramdict.keys()
 
-            if not paramdict.keys().isdisjoint(all_output_keys):
-                raise SpecError('some output vars are also input vars')
+        if not paramdict.keys().isdisjoint(all_output_keys):
+            raise SpecError('some output vars are also input vars')
 
-            result = paramdict.copy()
-            for k in all_output_keys:
-                result[k] = None
+        result = paramdict.copy()
+        for k in all_output_keys:
+            result[k] = None
 
-            no_result = False
-            try:
-                job_result = results[index]
-            except KeyError:
+        no_result = False
+        try:
+            job_result = results[index]
+        except KeyError:
+            no_result = True
+        else:
+            if job_result.state.status != JobStateType.COMPLETED:
                 no_result = True
-            else:
-                if job_result.state.status != JobStateType.COMPLETED:
-                    no_result = True
 
-            if no_result:
-                ret.append(result)
-                continue
-
-            rundir = job_result.cwd
-
-            for spec in prog_spec.out_file_specs:
-                update_result(result, machine, rundir, spec.name,
-                              spec.outputspecs)
-            for spec in launch_profile.out_file_specs:
-                update_result(result, machine, rundir, spec.name,
-                              spec.outputspecs)
-            update_result(
-                result, machine,
-                f'{launch_profile.base_dir}/out', f'{job_result.jobid}.out',
-                prog_spec.stdout)
-
+        if no_result:
             ret.append(result)
+            continue
 
-        return list(paramkeys) + list(all_output_keys), ret
+        rundir = job_result.cwd
+
+        for spec in prog_spec.out_file_specs:
+            update_result(result, machine, rundir, spec.name,
+                          spec.outputspecs)
+        for spec in launch_profile.out_file_specs:
+            update_result(result, machine, rundir, spec.name,
+                          spec.outputspecs)
+        update_result(
+            result, machine,
+            f'{launch_profile.base_dir}/out', f'{job_result.jobid}.out',
+            prog_spec.stdout)
+
+        ret.append(result)
+
+    return list(paramkeys) + list(all_output_keys), ret
