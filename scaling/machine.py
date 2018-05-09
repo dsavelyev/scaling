@@ -5,6 +5,7 @@ import shlex
 import stat
 import subprocess
 import tempfile
+import threading
 from concurrent.futures import ThreadPoolExecutor
 
 import paramiko
@@ -79,6 +80,8 @@ class SSHMachine:
         self.sftp_chan.invoke_subsystem('sftp')
         self.sftp_client = paramiko.SFTPClient(self.sftp_chan)
 
+        self.lock = threading.Lock()
+
         self.closed = False
 
     def _raise_if_closed(self):
@@ -92,69 +95,71 @@ class SSHMachine:
         _logger.debug(stdin)
         cmd = ' '.join(map(shlex.quote, args))
 
-        with self.client.get_transport().open_session() as chan:
-            chan.exec_command(cmd)
+        with self.lock:
+            with self.client.get_transport().open_session() as chan:
+                chan.exec_command(cmd)
 
-            def read_thread(method):
-                s = bytearray()
+                def read_thread(method):
+                    s = bytearray()
 
-                while True:
-                    temp = method(4096)
-                    if temp:
-                        s += temp
-                    else:
-                        break
+                    while True:
+                        temp = method(4096)
+                        if temp:
+                            s += temp
+                        else:
+                            break
 
-                return bytes(s)
+                    return bytes(s)
 
-            with ThreadPoolExecutor(max_workers=2) as executor:
-                out_future = executor.submit(read_thread, chan.recv)
-                err_future = executor.submit(read_thread, chan.recv_stderr)
+                with ThreadPoolExecutor(max_workers=2) as executor:
+                    out_future = executor.submit(read_thread, chan.recv)
+                    err_future = executor.submit(read_thread, chan.recv_stderr)
 
-                chan.sendall(stdin)
-                chan.shutdown_write()
+                    chan.sendall(stdin)
+                    chan.shutdown_write()
 
-            out, err = out_future.result(), err_future.result()
+                out, err = out_future.result(), err_future.result()
 
-            exitcode = chan.recv_exit_status()
-            _logger.debug(f'out {out}, err {err}, exitcode {exitcode}')
-            return out, err, exitcode
+                exitcode = chan.recv_exit_status()
+                _logger.debug(f'out {out}, err {err}, exitcode {exitcode}')
+                return out, err, exitcode
 
     # FIXME: newline handling
 
     def get_file(self, path, text=True):
         self._raise_if_closed()
 
-        with self.sftp_client.file(path) as f:
-            result = f.read()
-            if text:
-                result = result.decode('utf-8')
-            return result
+        with self.lock:
+            with self.sftp_client.file(path) as f:
+                result = f.read()
+                if text:
+                    result = result.decode('utf-8')
+                return result
 
     def put_file(self, path, data):
         self._raise_if_closed()
 
-        if isinstance(data, str):
-            data = data.encode('utf-8')
-        with self.sftp_client.file(path, 'w') as f:
-            f.write(data)
+        with self.lock:
+            if isinstance(data, str):
+                data = data.encode('utf-8')
+            with self.sftp_client.file(path, 'w') as f:
+                f.write(data)
 
     def mkdir(self, path):
         self._raise_if_closed()
 
-        try:
-            st = self.sftp_client.stat(path)
-        except FileNotFoundError:
-            self.sftp_client.mkdir(path, 0o755)
-            return False
-        else:
-            if not stat.S_ISDIR(st.st_mode):
-                raise FileExistsError
-            return True
+        with self.lock:
+            try:
+                st = self.sftp_client.stat(path)
+            except FileNotFoundError:
+                self.sftp_client.mkdir(path, 0o755)
+                return False
+            else:
+                if not stat.S_ISDIR(st.st_mode):
+                    raise FileExistsError
+                return True
 
     def mkdtemp(self, prefix):
-        self._raise_if_closed()
-
         _logger.debug(f'mkdtemp {prefix}')
         out, _, exitcode = self.run_command(
             ['mktemp', '-d', prefix + '.XXXXXX'])
@@ -163,22 +168,24 @@ class SSHMachine:
         return out.decode('utf-8').strip('\r\n')
 
     def list_files(self, dirname):
-        self._raise_if_closed()
+        with self.lock:
+            self._raise_if_closed()
 
-        it = self.sftp_client.listdir_iter(dirname)
-        for entry in it:
-            yield entry.filename
+            it = self.sftp_client.listdir_iter(dirname)
+            for entry in it:
+                yield entry.filename
 
     def close(self):
-        self._raise_if_closed()
+        with self.lock:
+            self._raise_if_closed()
 
-        self.client.close()
-        self.closed = True
+            self.client.close()
+            self.closed = True
 
     def __enter__(self):
-        self._raise_if_closed()
+        with self.lock:
+            self._raise_if_closed()
         return self
 
     def __exit__(self, *args):
-        self._raise_if_closed()
         self.close()
