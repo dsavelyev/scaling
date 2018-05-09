@@ -360,7 +360,7 @@ def run_experiment(machine, scheduler, submitter):
             while submitter.is_alive():
                 key = poll_keyboard()
                 if interrupted or key in ('c', 'q'):
-                    print('Stopping')
+                    print('Stopping', file=sys.stderr)
                     submitter.stop()
                     break
                 time.sleep(0.5)

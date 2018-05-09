@@ -189,7 +189,6 @@ class ThrottlingSubmitter(threading.Thread):
                  max_attempts_fail_external=10):
         super().__init__()
 
-        self._q = queue.Queue()
         self._evt = threading.Event()
         self._alive_evt = threading.Event()
         self._done = False

@@ -101,6 +101,7 @@ class RemoteScheduler:
 
     def __enter__(self):
         self._raise_if_closed()
+        return self
 
     def __exit__(self, *args):
         self._raise_if_closed()
