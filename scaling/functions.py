@@ -99,7 +99,7 @@ def our_range(*args):
 def reraise_exc(func):
     def inner(*args, **kwargs):
         try:
-            func(*args, **kwargs)
+            return func(*args, **kwargs)
         except Exception as e:
             raise FunctionError(str(e))
 

@@ -1,4 +1,4 @@
-import scaling.jobs as sj
+import scaling.launch as sl
 import pytest
 from functools import reduce
 
@@ -16,7 +16,7 @@ from functools import reduce
     ),
 ])
 def test_schedule_jobs(jobspecs, throttles):
-    generator = sj.schedule_jobs(jobspecs, throttles)
+    generator = sl.schedule_jobs(jobspecs, throttles)
 
     in_flight_jobs = set()
     done_jobs = set()
@@ -48,7 +48,7 @@ def test_schedule_jobs(jobspecs, throttles):
     ],
 ])
 def test_schedule_jobs_1pass(jobspecs):
-    generator = sj.schedule_jobs(jobspecs, {})
+    generator = sl.schedule_jobs(jobspecs, {})
 
     batch = next(generator)
     assert set(batch) == set(range(len(jobspecs)))
