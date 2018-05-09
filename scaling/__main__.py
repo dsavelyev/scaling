@@ -332,9 +332,6 @@ def get_machine(machine_spec):
 
 
 def run_experiment(machine, scheduler, submitter):
-    submitter.start()
-    submitter.wait_alive()
-
     interrupted = False
     def sigint_handler(*args):
         nonlocal interrupted
@@ -343,6 +340,9 @@ def run_experiment(machine, scheduler, submitter):
     # defer handling Ctrl-C until the thread is done
     with stdin_noecho():
         with handle_sigint(sigint_handler):
+            submitter.start()
+            submitter.wait_alive()
+
             print('Press [q] or Ctrl-C to quit, [c] to quit and cancel all '
                   'jobs', file=sys.stderr)
 
