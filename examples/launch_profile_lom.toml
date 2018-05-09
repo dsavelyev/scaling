@@ -1,0 +1,23 @@
+machine = "Lomonosov2.toml"
+param_order = ["type", "modules", "partition", "ntasks", "ntasks_per_node", "preload"]
+start_cmd = "/home/user/scaling-scripts/bin/scaling-start"
+poll_cmd = "/home/user/scaling-scripts/bin/scaling-poll"
+cancel_cmd = "/home/user/scaling-scripts/bin/scaling-cancel"
+base_dir = "/home/user/_scratch/scaling"
+
+[params]
+type = "str"
+modules = "str"
+partition = "str"
+ntasks = "int"
+ntasks_per_node = "int"
+preload = "int"
+
+[[out_file_specs]]
+name = "__mpiperf.txt"
+
+[[out_file_specs.outputspecs]]
+regex = "%{FLOAT:mpitime}"
+
+[out_file_specs.outputspecs.vartypes]
+mpitime = "float"

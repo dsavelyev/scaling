@@ -1,0 +1,10 @@
+machine = "BGP.toml"
+start_cmd = "/home/user/scaling-scripts/bin/scaling-start"
+poll_cmd = "/home/user/scaling-scripts/bin/scaling-poll"
+cancel_cmd = "/home/user/scaling-scripts/bin/scaling-cancel"
+base_dir = "/home/user/scaling"
+param_order = ["ntasks", "mode"]
+
+[params]
+ntasks = "int"
+mode = "str"
