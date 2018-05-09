@@ -49,6 +49,7 @@ class ParamSpecParser:
         self.parser = yacc.yacc(
             module=self,
             debug=debug,
+            write_tables=False,
             start=self.start if not single else 'expression')
 
     def parse(self, s):
