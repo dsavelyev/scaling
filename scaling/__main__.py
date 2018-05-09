@@ -282,9 +282,10 @@ def load_results(file):
 
     for d in dlist:
         _validate_schema(d, _result_schema, file.name)
-        results[d['index']] = launch.Result(d['jobid'],
-                                     get_job_state(d['state'], file.name),
-                                     d['cwd'])
+        results[d['index']] = launch.Result(
+            d['jobid'],
+            get_job_state(d['state'], file.name),
+            d['cwd'])
 
     return results
 
