@@ -289,43 +289,28 @@ def load_results(file):
     return results
 
 
-class unlink_on_exception:
-    def __init__(self, file):
-        self._file = file
-        self._filepath = os.path.realpath(file.name)
-
-    def __enter__(self):
-        pass
-
-    def __exit__(self, exc_type, exc_value, tb):
-        if exc_type is not None:
-            self._file.close()
-            os.unlink(self._filepath)
-
-
 def genparams(args):
-    with unlink_on_exception(args.launch_spec):
-        try:
-            site_spec = load_launch_profile(args.launch_profile)
-            prog_spec = load_prog_spec(args.prog_spec)
-        except ConfigError as e:
-            raise UserError(str(e))
+    try:
+        site_spec = load_launch_profile(args.launch_profile)
+        prog_spec = load_prog_spec(args.prog_spec)
+    except ConfigError as e:
+        raise UserError(str(e))
 
-        try:
-            params = gen_params(args.param_spec.read())
-        except ParamSpecError as e:
-            raise UserError(str(e))
+    try:
+        params = gen_params(args.param_spec.read())
+    except ParamSpecError as e:
+        raise UserError(str(e))
 
-        params = list(params)
-        print(f'Number of runs: {len(params)}', file=sys.stderr)
+    params = list(params)
+    print(f'Number of runs: {len(params)}', file=sys.stderr)
 
-        try:
-            generator = launch.gen_launch_specs(site_spec, prog_spec, params)
-        except launch.SpecError as e:
-            raise UserError(str(e))
+    try:
+        generator = launch.gen_launch_specs(site_spec, prog_spec, params)
+    except launch.SpecError as e:
+        raise UserError(str(e))
 
-        write_launch_specs(args.launch_spec, args.launch_profile.name,
-                args.prog_spec.name, args.executable, generator)
+    write_launch_specs(args.launch_spec, args.launch_profile.name,
+            args.prog_spec.name, args.executable, generator)
 
 
 def get_machine(machine_spec):
@@ -386,65 +371,63 @@ def run_experiment(machine, scheduler, submitter):
 
 
 def do_launch(args):
-    with unlink_on_exception(args.result_file):
-        print('Parsing launch specs...', file=sys.stderr)
-        launch_profile, _, executable, launch_specs = load_launch_specs(args.launch_spec)
-        throttles = args.throttle
+    print('Parsing launch specs...', file=sys.stderr)
+    launch_profile, _, executable, launch_specs = load_launch_specs(args.launch_spec)
+    throttles = args.throttle
 
-        throttledict = {}
-        for k, v in throttles:
-            throttledict[k] = int(v)
+    throttledict = {}
+    for k, v in throttles:
+        throttledict[k] = int(v)
 
-        paramdicts = [spec.params for spec in launch_specs]
-        try:
-            job_generator = launch.schedule_jobs(paramdicts, throttledict)
-        except launch.SpecError as e:
-            raise UserError(str(e))
+    paramdicts = [spec.params for spec in launch_specs]
+    try:
+        job_generator = launch.schedule_jobs(paramdicts, throttledict)
+    except launch.SpecError as e:
+        raise UserError(str(e))
 
-        with get_machine(launch_profile.machine) as machine:
-            cwds, outdir = launch.create_experiment_inputs(machine, launch_profile, launch_specs)
+    with get_machine(launch_profile.machine) as machine:
+        cwds, outdir = launch.create_experiment_inputs(machine, launch_profile, launch_specs)
 
-            jobspecs = []
-            for i, spec in enumerate(launch_specs):
-                exec_args = [executable]
-                exec_args.extend(spec.args)
+        jobspecs = []
+        for i, spec in enumerate(launch_specs):
+            exec_args = [executable]
+            exec_args.extend(spec.args)
 
-                jobspecs.append(jobs.JobSpec(exec_args, spec.params, cwds[i]))
+            jobspecs.append(jobs.JobSpec(exec_args, spec.params, cwds[i]))
 
-            scheduler = jobs.RemoteScheduler(
-                machine,
-                launch_profile.start_cmd,
-                launch_profile.poll_cmd,
-                launch_profile.cancel_cmd,
-                launch_profile.param_order,
-                outdir,
-                poll_interval=15)
-            with scheduler:
-                submitter = launch.ThrottlingSubmitter(scheduler, jobspecs,
-                        launch.schedule_jobs(paramdicts, throttledict))
+        scheduler = jobs.RemoteScheduler(
+            machine,
+            launch_profile.start_cmd,
+            launch_profile.poll_cmd,
+            launch_profile.cancel_cmd,
+            launch_profile.param_order,
+            outdir,
+            poll_interval=15)
+        with scheduler:
+            submitter = launch.ThrottlingSubmitter(scheduler, jobspecs,
+                    launch.schedule_jobs(paramdicts, throttledict))
 
-                raw_results = run_experiment(machine, scheduler, submitter)
+            raw_results = run_experiment(machine, scheduler, submitter)
 
-        results = {index: launch.Result(jobid, state, cwds[index])
-                   for index, (jobid, state) in raw_results.items()}
-        write_results(args.result_file, results)
+    results = {index: launch.Result(jobid, state, cwds[index])
+               for index, (jobid, state) in raw_results.items()}
+    write_results(args.result_file, results)
 
 
 def getoutputs(args):
-    with unlink_on_exception(args.out):
-        print('Parsing launch specs...', file=sys.stderr)
-        launch_profile, prog_spec, _, launch_specs = load_launch_specs(args.launch_spec)
-        print('Parsing results...', file=sys.stderr)
-        results = load_results(args.result_file)
+    print('Parsing launch specs...', file=sys.stderr)
+    launch_profile, prog_spec, _, launch_specs = load_launch_specs(args.launch_spec)
+    print('Parsing results...', file=sys.stderr)
+    results = load_results(args.result_file)
 
-        with get_machine(launch_profile.machine) as machine:
-            print('Downloading and parsing outputs...', file=sys.stderr)
-            fieldnames, out = launch.parse_outputs(machine, launch_profile, prog_spec, launch_specs, results)
+    with get_machine(launch_profile.machine) as machine:
+        print('Downloading and parsing outputs...', file=sys.stderr)
+        fieldnames, out = launch.parse_outputs(machine, launch_profile, prog_spec, launch_specs, results)
 
-        print('Writing CSV...', file=sys.stderr)
-        dw = csv.DictWriter(args.out, fieldnames)
-        dw.writeheader()
-        dw.writerows(out)
+    print('Writing CSV...', file=sys.stderr)
+    dw = csv.DictWriter(args.out, fieldnames)
+    dw.writeheader()
+    dw.writerows(out)
 
 
 def main():
