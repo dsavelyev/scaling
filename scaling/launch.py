@@ -271,28 +271,29 @@ class ThrottlingSubmitter(threading.Thread):
             if status not in final_states:
                 return
 
+            job_done = True
             if status == JobStateType.FAIL_EXTERNAL:
                 self._attempt_counts[index] += 1
                 if self._attempt_counts[index] < self._max_attempts_fail_external:
                     _logger.warning(f'Will resubmit {jobid}')
                     self._batch.append(index)
+                    job_done = False
                 else:
                     _logger.error(f'{jobid} failed {self._max_attempts_fail_external} times, will not resubmit')
-                return
 
-            _logger.info(f'{jobid} aka {index} done')
-            self._num_pending -= 1
-            if not self._num_pending:
-                _logger.debug('All jobs done, exiting from handle_event')
-                self._done = True
-                return
-
-            try:
-                newjobs = self._generator.send(index)
-                _logger.debug(f'Received batch {newjobs}')
-                self._batch.extend(newjobs)
-            except StopIteration:
-                pass
+            if job_done:
+                _logger.info(f'{jobid} aka {index} done')
+                self._num_pending -= 1
+                if not self._num_pending:
+                    _logger.debug('All jobs done, exiting from handle_event')
+                    self._done = True
+                    return
+                try:
+                    newjobs = self._generator.send(index)
+                    _logger.debug(f'Received batch {newjobs}')
+                    self._batch.extend(newjobs)
+                except StopIteration:
+                    pass
 
             self._schedule_next_submit()
 
@@ -309,7 +310,7 @@ class ThrottlingSubmitter(threading.Thread):
     def _submit(self):
         self._next_submit_event = None
 
-        index = self._batch.popleft()
+        index = self._batch[0]
         spec = self._jobspecs[index]
 
         jobid = None
@@ -324,6 +325,8 @@ class ThrottlingSubmitter(threading.Thread):
 
             self._schedule_next_submit(self._attempt_interval)
             return
+        else:
+            self._batch.popleft()
 
         if jobid is not None:
             self._jobids[jobid] = index
