@@ -361,9 +361,9 @@ def do_launch(scheduler, submitter):
 
     results = submitter.result()
 
-    jobids = [x[0] for x in results.values()]
     if key == b'c':
         print('Trying to cancel all submitted jobs', file=sys.stderr)
+        jobids = [x[0] for x in results.values() if x[1].status not in jobs.final_states]
         try:
             scheduler.cancel_jobs(jobids)
         except SchedulerError as e:
@@ -409,7 +409,7 @@ def run_experiment(args):
             poll_interval=15)
         with scheduler:
             submitter = launch.ThrottlingSubmitter(scheduler, jobspecs,
-                    launch.schedule_jobs(paramdicts, throttledict))
+                    job_generator)
 
             raw_results = do_launch(machine, scheduler, submitter)
 

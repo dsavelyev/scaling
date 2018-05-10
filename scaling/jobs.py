@@ -44,10 +44,14 @@ class JobState:
 
 class Job:
     def __init__(self, jobid, state, callback):
-        self.jobid = jobid
+        self._jobid = jobid
         self._state = state
         self._callback = callback
         self._lock = threading.Lock()
+
+    @property
+    def jobid(self):
+        return self._jobid
 
     @property
     def state(self):
@@ -60,7 +64,7 @@ class Job:
             oldstate, self._state = self._state, newstate
 
         if oldstate != newstate:
-            self._callback(self.jobid, newstate)
+            self._callback(self._jobid, newstate)
 
 
 class SchedulerError(Exception):
@@ -91,7 +95,9 @@ class RemoteScheduler:
 
         self.jobs = {}
         self.ticks = {}
+        self.cancelled = set()
         self.lock = threading.Lock()
+        self.cancel_lock = threading.Lock()
         self.polling_thread = RepeatingTimerThread(poll_interval,
                                                    self._poll_cb)
         self.closed = False
@@ -116,7 +122,9 @@ class RemoteScheduler:
         return b''.join(jobid.encode('utf-8') + b'\n' for jobid in jobids)
 
     def _update_job_state(self, jobid, state):
-        self.jobs[jobid].state = state
+        with self.lock:
+            js = self.jobs[jobid]
+        js.state = state
 
         if state.status in final_states:
             self.jobs.pop(jobid)
@@ -138,18 +146,19 @@ class RemoteScheduler:
         else:
             jobid = out.rstrip(b'\r\n').decode('utf-8')
 
-        js = Job(jobid, None, callback)
+        js = Job(jobid, JobState(JobStateType.SUBMITTED, 0), callback)
         with self.lock:
             self.jobs[jobid] = js
-        self._update_job_state(jobid, JobState(JobStateType.SUBMITTED, 0))
 
-        return jobid
+        return js
 
     def _fail_all(self):
         with self.lock:
-            for jobid in self.jobs:
-                self._update_job_state(jobid,
-                                       JobState(JobStateType.FAIL_EXTERNAL, 0))
+            jobids = self.jobs.keys().copy()
+
+        for jobid in jobids:
+            self._update_job_state(jobid,
+                                   JobState(JobStateType.FAIL_EXTERNAL, 0))
 
     def _poll_cb(self):
         with self.lock:
@@ -159,7 +168,10 @@ class RemoteScheduler:
             stdin = RemoteScheduler._serialize_jobids(self.jobs)
 
         poll_args = [self.poll_cmd]
-        out, err, exitcode = self.machine.run_command(poll_args, stdin)
+
+        with self.cancel_lock:
+            out, err, exitcode = self.machine.run_command(poll_args, stdin)
+
         if exitcode != 0:
             self.poll_fails += 1
             if self.poll_fails >= 15:
@@ -182,15 +194,22 @@ class RemoteScheduler:
 
                 polled_jobids.add(jobid)
 
-                with self.lock:
-                    self._update_job_state(
-                        jobid, JobState(state, exitcode))
+                self._update_job_state(
+                    jobid, JobState(state, exitcode))
 
         missing_jobids = jobids - polled_jobids
         for jobid in missing_jobids:
             try:
                 exit_code = int(self.machine.get_file(f'{self.outdir}/{jobid}.exitcode'))
             except FileNotFoundError:
+                with self.cancel_lock:
+                    cancelled = jobid in self.cancelled
+                if cancelled:
+                    self._update_job_state(jobid, JobState(JobStateType.CANCELLED, 0))
+                    with self.cancel_lock:
+                        self.cancelled.remove(jobid)
+                    continue
+
                 if jobid not in self.ticks:
                     self.ticks[jobid] = 1
                 else:
@@ -198,8 +217,7 @@ class RemoteScheduler:
                 if self.ticks[jobid] >= 5:
                     _logger.error(f'Job {jobid}: no exit code after 5 queue '
                             'polls, assuming FAIL_EXTERNAL')
-                    with self.lock:
-                        self._update_job_state(jobid, JobState(JobStateType.FAIL_EXTERNAL, 0))
+                    self._update_job_state(jobid, JobState(JobStateType.FAIL_EXTERNAL, 0))
                     self.ticks.pop(jobid)
                 else:
                     self._update_job_state(jobid, JobState(JobStateType.SUBMITTED, 0))
@@ -214,7 +232,10 @@ class RemoteScheduler:
 
         if jobids:
             cancel_args = [self.cancel_cmd]
-            out, err, exitcode = self.machine.run_command(
-                cancel_args, RemoteScheduler._serialize_jobids(jobids))
-            if exitcode != 0:
-                raise SchedulerError(f'Cancel command failed with stderr {err}')
+            with self.cancel_lock:
+                out, err, exitcode = self.machine.run_command(
+                    cancel_args, RemoteScheduler._serialize_jobids(jobids))
+                if exitcode != 0:
+                    raise SchedulerError(f'Cancel command failed with stderr {err}')
+                else:
+                    self.cancelled.update(jobids)
