@@ -198,7 +198,9 @@ class RemoteScheduler:
                 if self.ticks[jobid] >= 5:
                     _logger.error(f'Job {jobid}: no exit code after 5 queue '
                             'polls, assuming FAIL_EXTERNAL')
-                    self._update_job_state(jobid, JobState(JobStateType.FAIL_EXTERNAL, 0))
+                    with self.lock:
+                        self._update_job_state(jobid, JobState(JobStateType.FAIL_EXTERNAL, 0))
+                    self.ticks.pop(jobid)
                 else:
                     self._update_job_state(jobid, JobState(JobStateType.SUBMITTED, 0))
             else:
