@@ -1,0 +1,11 @@
+#!/bin/sh
+
+OUTDIR="$1"
+shift
+
+EXITCODE_FILE="$OUTDIR/$SLURM_JOB_ID.exitcode"
+
+"$@"
+EXITCODE=$?
+echo $EXITCODE > "$EXITCODE_FILE"
+exit $EXITCODE

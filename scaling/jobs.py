@@ -154,6 +154,7 @@ class RemoteScheduler:
         with self.lock:
             if not self.jobs:
                 return
+            jobids = self.jobs.keys()
             stdin = RemoteScheduler._serialize_jobids(self.jobs)
 
         poll_args = [self.poll_cmd]
@@ -169,15 +170,30 @@ class RemoteScheduler:
         else:
             self.poll_fails = 0
 
+        polled_jobids = set()
+
         if out:
             for line in out.rstrip(b'\r\n').splitlines():
                 jobid, state, exitcode = line.split(b'|')
-                exitcode = int(exitcode)
+                jobid = jobid.decode('utf-8')
                 state = JobStateType[state.decode('utf-8')]
+                exitcode = int(exitcode)
+
+                polled_jobids.add(jobid)
 
                 with self.lock:
                     self._update_job_state(
-                        jobid.decode('utf-8'), JobState(state, exitcode))
+                        jobid, JobState(state, exitcode))
+
+        missing_jobids = jobids - polled_jobids
+        for jobid in missing_jobids:
+            try:
+                exit_code = int(self.machine.get_file(f'{self.outdir}/{jobid}.exitcode'))
+            except FileNotFoundError:
+                self._update_job_state(jobid, JobState(JobStateType.FAIL_EXTERNAL, exit_code))
+            else:
+                self._update_job_state(jobid, JobState(JobStateType.COMPLETED if exit_code == 0
+                                                       else JobStateType.FAIL_EXIT_CODE, exit_code))
 
     def cancel_jobs(self, jobids):
         self._raise_if_closed()

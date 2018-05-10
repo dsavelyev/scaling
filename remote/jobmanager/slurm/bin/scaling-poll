@@ -11,41 +11,23 @@ commas() {
     echo "$*"
 }
 
-do_sacct() {
+do_squeue() {
     IFS='|'
-    sacct --noheader -X --parsable2 --starttime 1970-01-01 -j "$(commas $@)" -o 'JobID,State,ExitCode' | while read -r jobid state exitcode; do
+    squeue --noheader -o '%i|%T' -j "$(commas $@)" | while read -r jobid state; do
         [[ "$jobid" =~ \. ]] && continue
 
-        exit_status=$(echo $exitcode | cut -d: -f1)
-        termsig=$(echo $exitcode | cut -d: -f2)
-        if [ $termsig != 0 ]; then
-            our_exit_code=-$termsig
-        else
-            our_exit_code=$exit_status
-        fi
-
-        # FIXME: some of these might be wrong (e.g. need asterisks)
         case $state in
-        RUNNING|COMPLETING)
+        RUNNING)
             our_state=RUNNING;;
-        PENDING|CONFIGURING|RESIZING|SUSPENDED)
-            our_state=SUBMITTED;;
-        CANCELLED*)
-            our_state=CANCELLED;;
-        BOOT_FAIL|NODE_FAIL|PREEMPTED|TIMEOUT)
-            our_state=FAIL_EXTERNAL;;
-        FAILED)
-            our_state=FAIL_EXIT_CODE;;
-        COMPLETED)
-            our_state=COMPLETED;;
         *)
-            our_state=UNKNOWN;;
+            our_state=PENDING;;
         esac
 
-        echo "${jobid}|${our_state}|${our_exit_code}"
+        echo "${jobid}|${our_state}"
     done
 
     exit "${PIPESTATUS[0]}"
 }
 
-bash_xargs do_sacct
+bash_xargs do_squeue
+exit 0
