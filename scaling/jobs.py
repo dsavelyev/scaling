@@ -90,6 +90,7 @@ class RemoteScheduler:
         self.poll_fails = 0
 
         self.jobs = {}
+        self.ticks = {}
         self.lock = threading.Lock()
         self.polling_thread = RepeatingTimerThread(poll_interval,
                                                    self._poll_cb)
@@ -162,8 +163,8 @@ class RemoteScheduler:
         if exitcode != 0:
             self.poll_fails += 1
             if self.poll_fails >= 15:
-                _logger.error('Queue poll failed 15 times in a row. '+
-                        'Assuming something has gone horribly wrong. '+
+                _logger.error('Queue poll failed 15 times in a row. '
+                        'Assuming something has gone horribly wrong. '
                         'Setting all jobs to FAIL_EXTERNAL state')
                 self._fail_all()
             return
@@ -190,8 +191,19 @@ class RemoteScheduler:
             try:
                 exit_code = int(self.machine.get_file(f'{self.outdir}/{jobid}.exitcode'))
             except FileNotFoundError:
-                self._update_job_state(jobid, JobState(JobStateType.FAIL_EXTERNAL, exit_code))
+                if jobid not in self.ticks:
+                    self.ticks[jobid] = 1
+                else:
+                    self.ticks[jobid] += 1
+                if self.ticks[jobid] >= 5:
+                    _logger.error(f'Job {jobid}: no exit code after 5 queue '
+                            'polls, assuming FAIL_EXTERNAL')
+                    self._update_job_state(jobid, JobState(JobStateType.FAIL_EXTERNAL, 0))
+                else:
+                    self._update_job_state(jobid, JobState(JobStateType.SUBMITTED, 0))
             else:
+                if jobid in self.ticks:
+                    self.ticks.pop(jobid)
                 self._update_job_state(jobid, JobState(JobStateType.COMPLETED if exit_code == 0
                                                        else JobStateType.FAIL_EXIT_CODE, exit_code))
 

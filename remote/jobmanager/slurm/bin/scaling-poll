@@ -20,10 +20,10 @@ do_squeue() {
         RUNNING)
             our_state=RUNNING;;
         *)
-            our_state=PENDING;;
+            our_state=SUBMITTED;;
         esac
 
-        echo "${jobid}|${our_state}"
+        echo "${jobid}|${our_state}|0"
     done
 
     exit "${PIPESTATUS[0]}"
