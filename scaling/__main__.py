@@ -331,7 +331,7 @@ def get_machine(machine_spec):
     return machine
 
 
-def run_experiment(machine, scheduler, submitter):
+def do_launch(scheduler, submitter):
     interrupted = False
     def sigint_handler(*args):
         nonlocal interrupted
@@ -374,7 +374,7 @@ def run_experiment(machine, scheduler, submitter):
     return results
 
 
-def do_launch(args):
+def run_experiment(args):
     print('Parsing launch specs...', file=sys.stderr)
     launch_profile, _, executable, launch_specs = load_launch_specs(args.launch_spec)
     throttles = args.throttle
@@ -411,7 +411,7 @@ def do_launch(args):
             submitter = launch.ThrottlingSubmitter(scheduler, jobspecs,
                     launch.schedule_jobs(paramdicts, throttledict))
 
-            raw_results = run_experiment(machine, scheduler, submitter)
+            raw_results = do_launch(machine, scheduler, submitter)
 
     results = {index: launch.Result(jobid, state, cwds[index])
                for index, (jobid, state) in raw_results.items()}
@@ -463,7 +463,7 @@ def main():
         required=False, default=[])
     parser_launch.add_argument(
         '-o', '--result-file', type=argparse.FileType('w'), required=True)
-    parser_launch.set_defaults(func=do_launch)
+    parser_launch.set_defaults(func=run_experiment)
 
     parser_getoutputs = subparsers.add_parser('getoutputs')
     parser_getoutputs.add_argument(
