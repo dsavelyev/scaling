@@ -176,15 +176,13 @@ class SSHMachine:
                 yield entry.filename
 
     def close(self):
-        with self.lock:
-            self._raise_if_closed()
+        self._raise_if_closed()
 
-            self.client.close()
-            self.closed = True
+        self.client.close()
+        self.closed = True
 
     def __enter__(self):
-        with self.lock:
-            self._raise_if_closed()
+        self._raise_if_closed()
         return self
 
     def __exit__(self, *args):

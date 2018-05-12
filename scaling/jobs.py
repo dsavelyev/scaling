@@ -68,11 +68,7 @@ class Job:
 
 
 class SchedulerError(Exception):
-    def __init__(self, msg):
-        self.msg = msg
-
-    def __repr__(self):
-        return msg
+    pass
 
 
 class RemoteScheduler:
@@ -132,10 +128,10 @@ class RemoteScheduler:
     def _update_job_state(self, jobid, state):
         with self.lock:
             js = self.jobs[jobid]
-        js.state = state
+            if state.status in final_states:
+                self.jobs.pop(jobid)
 
-        if state.status in final_states:
-            self.jobs.pop(jobid)
+        js.state = state
 
     def submit_job(self, spec, callback):
         self._raise_if_closed()
@@ -176,11 +172,7 @@ class RemoteScheduler:
             stdin = RemoteScheduler._serialize_jobids(self.jobs)
 
         poll_args = [self.poll_cmd]
-
-        # Make sure we never see the state between a job being (successfully)
-        # cancelled and it being added to self.cancelled
-        with self.cancel_lock:
-            out, err, exitcode = self.machine.run_command(poll_args, stdin)
+        out, err, exitcode = self.machine.run_command(poll_args, stdin)
 
         if exitcode != 0:
             self.poll_fails += 1
@@ -214,10 +206,11 @@ class RemoteScheduler:
             except FileNotFoundError:
                 with self.cancel_lock:
                     cancelled = jobid in self.cancelled
+                    if cancelled:
+                        self.cancelled.remove(jobid)
+
                 if cancelled:
                     self._update_job_state(jobid, JobState(JobStateType.CANCELLED, 0))
-                    with self.cancel_lock:
-                        self.cancelled.remove(jobid)
                     continue
 
                 if jobid not in self.ticks:
@@ -242,6 +235,9 @@ class RemoteScheduler:
 
         if jobids:
             cancel_args = [self.cancel_cmd]
+
+            # Take the lock now to prevent _poll_cb from seeing a state in
+            # which the jobs are cancelled, but we don't know yet
             with self.cancel_lock:
                 out, err, exitcode = self.machine.run_command(
                     cancel_args, RemoteScheduler._serialize_jobids(jobids))
