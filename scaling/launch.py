@@ -142,6 +142,11 @@ def create_experiment_inputs(machine, launch_profile, launch_specs):
 
 
 def schedule_jobs(paramdicts, throttles, max_attempt_counts=10):
+    for index, params in enumerate(paramdicts):
+        if any(throttles.get(key) is not None and value > throttles[key]
+               for key, value in params.items()):
+            raise SpecError('job index {index}: some parameters exceed their throttle values')
+
     throttle_vars = {}
     for name, value in throttles.items():
         throttle_vars[name] = 0
