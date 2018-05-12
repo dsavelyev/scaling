@@ -83,21 +83,29 @@ class RemoteScheduler:
                  cancel_cmd,
                  param_spec,
                  outdir,
-                 poll_interval=60):
+                 poll_interval=60,
+                 max_polls_no_job=5):
         self.machine = machine
         self.start_cmd = start_cmd
         self.poll_cmd = poll_cmd
         self.cancel_cmd = cancel_cmd
         self.param_spec = param_spec
         self.outdir = outdir
+        self.max_polls_no_job = max_polls_no_job
 
         self.poll_fails = 0
 
         self.jobs = {}
         self.ticks = {}
         self.cancelled = set()
+
+        # protects self.jobs
         self.lock = threading.Lock()
+
+        # protects self.cancelled, and also against _poll_cb seeing a cancelled
+        # job not yet in self.cancelled
         self.cancel_lock = threading.Lock()
+
         self.polling_thread = RepeatingTimerThread(poll_interval,
                                                    self._poll_cb)
         self.closed = False
@@ -169,6 +177,8 @@ class RemoteScheduler:
 
         poll_args = [self.poll_cmd]
 
+        # Make sure we never see the state between a job being (successfully)
+        # cancelled and it being added to self.cancelled
         with self.cancel_lock:
             out, err, exitcode = self.machine.run_command(poll_args, stdin)
 
@@ -214,9 +224,9 @@ class RemoteScheduler:
                     self.ticks[jobid] = 1
                 else:
                     self.ticks[jobid] += 1
-                if self.ticks[jobid] >= 5:
-                    _logger.error(f'Job {jobid}: no exit code after 5 queue '
-                            'polls, assuming FAIL_EXTERNAL')
+                if self.ticks[jobid] >= self.max_polls_no_job:
+                    _logger.error(f'Job {jobid}: no exit code after {self.max_polls_no_job} queue '
+                        'polls, assuming FAIL_EXTERNAL')
                     self._update_job_state(jobid, JobState(JobStateType.FAIL_EXTERNAL, 0))
                     self.ticks.pop(jobid)
                 else:
