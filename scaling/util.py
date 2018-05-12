@@ -130,3 +130,10 @@ class handle_sigint:
 
     def __exit__(self, *args):
         signal.signal(signal.SIGINT, self._old_handler)
+
+
+def call_later(timeout, cancel_evt, func, *args, **kwargs):
+    cancel_evt.wait(timeout=timeout)
+    if cancel_evt.is_set():
+        return
+    return func(*args, **kwargs)

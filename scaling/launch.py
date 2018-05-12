@@ -11,7 +11,7 @@ import attr
 from .jobs import JobSpec, JobState, JobStateType, SchedulerError, final_states
 from .grok import Grok
 from .machine import SSHMachine
-from .util import poll_keyboard, handle_sigint
+from .util import call_later
 
 
 _logger = logging.getLogger(__name__)
@@ -194,13 +194,6 @@ def schedule_jobs(paramdicts, throttles, max_attempt_counts=10):
 
         num_pending -= 1
         batch = []
-
-
-def call_later(timeout, cancel_evt, func, *args, **kwargs):
-    cancel_evt.wait(timeout=timeout)
-    if cancel_evt.is_set():
-        return
-    return func(*args, **kwargs)
 
 
 class ThrottlingSubmitter(threading.Thread):
