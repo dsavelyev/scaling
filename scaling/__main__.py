@@ -411,7 +411,7 @@ def run_experiment(args):
             submitter = launch.ThrottlingSubmitter(scheduler, jobspecs,
                     job_generator)
 
-            raw_results = do_launch(machine, scheduler, submitter)
+            raw_results = do_launch(scheduler, submitter)
 
     results = {index: launch.Result(jobid, state, cwds[index])
                for index, (jobid, state) in raw_results.items()}
