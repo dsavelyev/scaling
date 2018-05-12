@@ -283,7 +283,7 @@ class ThrottlingSubmitter(threading.Thread):
             jobid, state = event
 
             index = self._jobids[jobid]
-            _logger.info(f'Job {jobid} (aka {index}) entered state {state}')
+            _logger.info(f'Job {index} (id {jobid}) entered state {state}')
 
             try:
                 newjobs = self._strategy.send((index, state))
@@ -291,6 +291,7 @@ class ThrottlingSubmitter(threading.Thread):
                 _logger.info('All jobs done')
                 self._done = True
             else:
+                _logger.debug(f'Received batch {newjobs}')
                 if newjobs:
                     self._batch.extend(newjobs)
 
@@ -304,12 +305,14 @@ class ThrottlingSubmitter(threading.Thread):
         try:
             job = self._scheduler.submit_job(spec, self._listener)
         except SchedulerError as e:
-            _logger.error(f'Submit error (will retry): {str(e)}')
+            _logger.error(f'Submit error (will retry): {e}')
             self._do_submit = False
             self._timer_tpe.submit(call_later,
                 self._attempt_interval, self._timer_cancel_evt, self._fire_event,
                 'SUBMIT')
             return False
+
+        _logger.info(f'Job {index} submitted with id {job.jobid}')
 
         self._batch.popleft()
         self._jobids[job.jobid] = index
