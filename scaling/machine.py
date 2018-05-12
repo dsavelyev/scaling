@@ -89,13 +89,13 @@ class SSHMachine:
             raise ValueError('this SSHMachine is closed')
 
     def run_command(self, args, stdin=b''):
-        self._raise_if_closed()
-
-        _logger.debug(args)
-        _logger.debug(stdin)
-        cmd = ' '.join(map(shlex.quote, args))
-
         with self.lock:
+            self._raise_if_closed()
+
+            _logger.debug(args)
+            _logger.debug(stdin)
+            cmd = ' '.join(map(shlex.quote, args))
+
             with self.client.get_transport().open_session() as chan:
                 chan.exec_command(cmd)
 
@@ -127,9 +127,9 @@ class SSHMachine:
     # FIXME: newline handling
 
     def get_file(self, path, text=True):
-        self._raise_if_closed()
-
         with self.lock:
+            self._raise_if_closed()
+
             with self.sftp_client.file(path) as f:
                 result = f.read()
                 if text:
@@ -137,18 +137,18 @@ class SSHMachine:
                 return result
 
     def put_file(self, path, data):
-        self._raise_if_closed()
-
         with self.lock:
+            self._raise_if_closed()
+
             if isinstance(data, str):
                 data = data.encode('utf-8')
             with self.sftp_client.file(path, 'w') as f:
                 f.write(data)
 
     def mkdir(self, path):
-        self._raise_if_closed()
-
         with self.lock:
+            self._raise_if_closed()
+
             try:
                 st = self.sftp_client.stat(path)
             except FileNotFoundError:
