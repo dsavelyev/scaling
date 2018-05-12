@@ -222,7 +222,6 @@ class ThrottlingSubmitter(threading.Thread):
         self._do_submit = True
 
         self._timer_tpe = ThreadPoolExecutor(max_workers=1)
-        self._timer_future = None
         self._timer_cancel_evt = threading.Event()
 
         self._batch = queue.deque()
@@ -314,7 +313,7 @@ class ThrottlingSubmitter(threading.Thread):
         except SchedulerError as e:
             _logger.error(f'Submit error (will retry): {str(e)}')
             self._do_submit = False
-            self._timer_future = self._timer_tpe.submit(call_later,
+            self._timer_tpe.submit(call_later,
                 self._attempt_interval, self._timer_cancel_evt, self._fire_event,
                 'SUBMIT')
             return False
