@@ -434,6 +434,7 @@ def parse_outputs(machine, launch_profile, prog_spec, launch_specs,
 
         rundir = job_result.cwd
 
+        _logger.info(f'Getting results for job {index}')
         for spec in prog_spec.out_file_specs:
             update_result(result, rundir, spec.name,
                           spec.outputspecs)
