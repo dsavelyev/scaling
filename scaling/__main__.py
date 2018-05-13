@@ -22,10 +22,6 @@ class LogFormatter(logging.Formatter):
         return f'[{record.name}] {record.getMessage()}'
 
 
-class ConfigError(Exception):
-    pass
-
-
 class UserError(Exception):
     pass
 
@@ -34,7 +30,7 @@ def _open_file(fname, src_fname):
     try:
         f = open(fname, 'r')
     except OSError as e:
-        raise ConfigError(f'{src_fname}: opening {fname}: {e.strerror}')
+        raise UserError(f'{src_fname}: opening {fname}: {e.strerror}')
     return f
 
 
@@ -42,22 +38,17 @@ def _toml_from_file(file):
     try:
         ret = pytoml.load(file)
     except pytoml.TomlError as e:
-        raise ConfigError(f'{file.name}: TOML is malformed: {e}')
+        raise UserError(f'{file.name}: TOML is malformed: {e}')
     return ret
-
-
-def _toml_from_filename(fname, src_fname):
-    with _open_file(fname, src_fname) as f:
-        return _toml_from_file(f)
 
 
 def _validate_schema(d, schema, fname):
     for name, (typ, defval) in schema.items():
         val = d.get(name, defval)
         if val is None:
-            raise ConfigError(f'{fname}: required parameter {name} not found')
+            raise UserError(f'{fname}: required parameter {name} not found')
         if not isinstance(val, typ):
-            raise ConfigError(f'{fname}: {name}: type mismatch')
+            raise UserError(f'{fname}: {name}: type mismatch')
 
         d.setdefault(name, defval)
 
@@ -91,14 +82,14 @@ def get_outputspec(spec, fname):
 
 def _validate_param_types(params, fname):
     if not isinstance(params, dict):
-        raise ConfigError(f'{fname}: params must be a dictionary')
+        raise UserError(f'{fname}: params must be a dictionary')
 
     for k, v in params.items():
         if not re.match(ParamSpecParser.ident_regex, k):
-            raise ConfigError(
+            raise UserError(
                 f'{fname}: parameter {k} is not a valid identifier')
         if v not in launch.types:
-            raise ConfigError(
+            raise UserError(
                 f'{fname}: parameter {k}: {v} is not one of int, float, str')
 
 
@@ -133,7 +124,7 @@ def load_launch_profile(file):
     _validate_schema(d, _launch_profile_schema, file.name)
 
     if not all(x in d['params'].keys() for x in d['param_order']):
-        raise ConfigError(f'{file.name}: unknown parameters in param_order')
+        raise UserError(f'{file.name}: unknown parameters in param_order')
 
     with _open_file(d['machine'], file.name) as f:
         d['machine'] = load_machine_spec(f)
@@ -173,7 +164,7 @@ def load_prog_spec(file):
     _validate_param_types(d['params'], file.name)
 
     if not all(isinstance(x, str) for x in d['args']):
-        raise ConfigError(f'{file.name}: args: type mismatch')
+        raise UserError(f'{file.name}: args: type mismatch')
 
     d['stdout'] = list(map(functools.partial(get_outputspec, fname=file.name), d['stdout']))
     d['out_file_specs'] = list(map(functools.partial(get_outfilespec, fname=file.name), d['out_file_specs']))
@@ -272,11 +263,11 @@ _result_schema = {
 def load_results(file):
     obj = _toml_from_file(file)
     if not isinstance(obj, dict):
-        raise ConfigError('invalid result spec')
+        raise UserError('invalid result spec')
     try:
         dlist = obj['result']
     except KeyError:
-        raise ConfigError('invalid result spec')
+        raise UserError('invalid result spec')
 
     results = {}
 
@@ -291,11 +282,8 @@ def load_results(file):
 
 
 def genparams(args):
-    try:
-        site_spec = load_launch_profile(args.launch_profile)
-        prog_spec = load_prog_spec(args.prog_spec)
-    except ConfigError as e:
-        raise UserError(str(e))
+    site_spec = load_launch_profile(args.launch_profile)
+    prog_spec = load_prog_spec(args.prog_spec)
 
     try:
         params = gen_params(args.param_spec.read())
