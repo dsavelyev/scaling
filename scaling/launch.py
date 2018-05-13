@@ -142,6 +142,10 @@ def create_experiment_inputs(machine, launch_profile, launch_specs):
 
 
 def schedule_jobs(paramdicts, throttles, max_attempt_counts=10):
+    '''
+    A generator that yields batches of jobs to submit and is fed
+    (jobindex, state) events.
+    '''
     for index, params in enumerate(paramdicts):
         if any(throttles.get(key) is not None and value > throttles[key]
                for key, value in params.items()):
@@ -249,16 +253,22 @@ class ThrottlingSubmitter(threading.Thread):
 
         while not self._done:
             if self._do_submit and self._batch and self._submit_one_job():
+                # if we have more jobs, don't block waiting for events
                 block = not self._batch
             else:
                 block = True
 
-            try:
-                evt = self._q.get(block=block)
-            except queue.Empty:
-                continue
-            else:
+            if block:
+                evt = self._q.get()
                 self._handle_event(evt)
+            else:
+                while True:
+                    try:
+                        evt = self._q.get_nowait()
+                    except queue.Empty:
+                        break
+                    else:
+                        self._handle_event(evt)
 
         _logger.debug('Exited from the event loop')
 
