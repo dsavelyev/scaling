@@ -1,16 +1,13 @@
 from concurrent.futures import ThreadPoolExecutor
 import fnmatch
 import logging
-import os.path
 import queue
 from string import Template
 import threading
-import time
 
 import attr
-from .jobs import JobSpec, JobState, JobStateType, SchedulerError, final_states
+from .jobs import JobStateType, SchedulerError, final_states
 from .grok import Grok
-from .machine import SSHMachine
 from .util import call_later
 
 
@@ -132,7 +129,6 @@ def create_experiment_inputs(machine, launch_profile, launch_specs):
     outdir = launch_profile.base_dir + '/out'
     machine.mkdir(outdir)
 
-    file_templates = []
     cwds = []
 
     for index, launch_spec in enumerate(launch_specs):

@@ -9,7 +9,6 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 
 import paramiko
-import toolz
 
 
 _logger = logging.getLogger(__name__)

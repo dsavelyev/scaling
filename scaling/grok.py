@@ -118,5 +118,5 @@ class Grok:
     def search(self, string):
         return regex.search(self._compiled_regex, string)
 
-    def names():
+    def names(self):
         return self._nameset

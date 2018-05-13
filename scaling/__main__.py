@@ -3,7 +3,6 @@ import csv
 import functools
 import getpass
 import logging
-import os
 import re
 import sys
 import time
@@ -366,7 +365,7 @@ def do_launch(scheduler, submitter):
         jobids = [x[0] for x in results.values() if x[1].status not in jobs.final_states]
         try:
             scheduler.cancel_jobs(jobids)
-        except SchedulerError as e:
+        except jobs.SchedulerError as e:
             print('Cancel failed', file=sys.stderr)
         else:
             print('Cancel succeeded', file=sys.stderr)

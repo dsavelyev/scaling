@@ -1,9 +1,7 @@
 import os
 import threading
 from enum import Enum
-import re
 import signal
-import string
 
 try:
     from msvcrt import kbhit, getch
