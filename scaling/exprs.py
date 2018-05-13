@@ -179,17 +179,36 @@ class ParamSpecParser:
         raise ParamSpecError('Syntax error near token {0}'.format(t))
 
 
+def _arith_binop(symbol, impl):
+    def inner(x, y):
+        if not isinstance(x, (int, float)) or not isinstance(y, (int, float)):
+            raise FunctionError(f'unsupported operand types for {symbol}: '
+                    '{type(x).__name__} and {type(y).__name__}')
+        return impl(x, y)
+    return inner
+
 _binopfuncs = {
-    '+': operator.add,
-    '-': operator.sub,
-    '*': operator.mul,
-    '/': lambda x, y: x // y if isinstance(x, int) and isinstance(y, int)\
-                      else x / y,
-    '^': operator.pow,
-    '%': operator.mod
+    '+': _arith_binop('+', operator.add),
+    '-': _arith_binop('-', operator.sub),
+    '*': _arith_binop('*', operator.mul),
+    '/': _arith_binop('/', lambda x, y: x // y if isinstance(x, int) and isinstance(y, int)\
+                      else x / y),
+    '^': _arith_binop('^', operator.pow),
+    '%': _arith_binop('%', operator.mod),
 }
 
-_unopfuncs = {'-': operator.neg}
+
+def _arith_unop(symbol, impl):
+    def inner(x):
+        if not isinstance(x, (int, float)):
+            raise FunctionError(f'unsupported operand type for {symbol}: '
+                    '{type(x).__name__}')
+        return impl(x)
+    return inner
+
+_unopfuncs = {
+    '-': _arith_unop('-', operator.neg)
+}
 
 
 def _real_eval_expr(expr, expr_vars):
