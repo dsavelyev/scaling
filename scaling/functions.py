@@ -41,7 +41,7 @@ def ilog_ceil(x, b):
 
 def multipartitions(x, count, incl_ones):
     if not isinstance(x, int) or not isinstance(count, int)\
-        or not isinstance(incl_ones, int):
+            or not isinstance(incl_ones, int):
         raise FunctionError('multipartitions: unsupported argument type')
     if x <= 0 or count <= 0:
         raise FunctionError('multipartitions: x and count must be positive')

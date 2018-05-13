@@ -1,15 +1,11 @@
-from concurrent.futures import ThreadPoolExecutor
 import enum
 import logging
-import queue
-import sched
 import threading
-import time
 import weakref
 
 import toolz
 import attr
-from .util import to_bytes, RepeatingTimerThread, OrderedEnum, param_to_string
+from .util import RepeatingTimerThread, OrderedEnum, param_to_string
 
 
 _logger = logging.getLogger(__name__)
@@ -78,6 +74,7 @@ class RemoteScheduler:
     ``_cmd`` commands. ``param_spec`` is an array specifying the order of
     parameters to the start script.
     '''
+
     def __init__(self,
                  machine,
                  start_cmd,
@@ -192,8 +189,8 @@ class RemoteScheduler:
             self.poll_fails += 1
             if self.poll_fails >= 15:
                 _logger.error('Queue poll failed 15 times in a row. '
-                        'Assuming something has gone horribly wrong. '
-                        'Setting all jobs to FAIL_EXTERNAL state')
+                              'Assuming something has gone horribly wrong. '
+                              'Setting all jobs to FAIL_EXTERNAL state')
                 self._fail_all()
             return
         else:
@@ -239,7 +236,7 @@ class RemoteScheduler:
                     self.ticks[jobid] += 1
                 if self.ticks[jobid] >= self.max_polls_no_job:
                     _logger.error(f'Job {jobid}: no exit code after {self.max_polls_no_job} queue '
-                        'polls, assuming FAIL_EXTERNAL')
+                                  'polls, assuming FAIL_EXTERNAL')
                     self._update_job_state(jobid, JobState(JobStateType.FAIL_EXTERNAL, 0))
                     self.ticks.pop(jobid)
                 else:

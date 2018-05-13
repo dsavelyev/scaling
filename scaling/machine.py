@@ -62,6 +62,7 @@ class SSHMachine:
     '''
     Represents a machine accessible via SSH.
     '''
+
     def __init__(self, host, port=22, username=None, pkey=None, password=None,
                  passphrase=None):
         # FIXME: auth. Currently it's "whatever paramiko feels like doing"

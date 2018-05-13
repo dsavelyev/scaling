@@ -107,6 +107,7 @@ else:
     class stdin_noecho:
         def __enter__(self):
             pass
+
         def __exit__(self, *args):
             pass
 

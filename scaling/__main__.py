@@ -63,7 +63,7 @@ def get_outfilespec(ofs, fname):
     _validate_schema(ofs, _outfilespec_schema, fname)
 
     outputspecs = list(map(functools.partial(get_outputspec, fname=fname),
-                       ofs['outputspecs']))
+                           ofs['outputspecs']))
     return launch.OutFileSpec(ofs['name'], outputspecs)
 
 
@@ -129,7 +129,8 @@ def load_launch_profile(file):
     with _open_file(d['machine'], file.name) as f:
         d['machine'] = load_machine_spec(f)
 
-    d['out_file_specs'] = list(map(functools.partial(get_outfilespec, fname=file.name), d['out_file_specs']))
+    d['out_file_specs'] = list(map(functools.partial(
+        get_outfilespec, fname=file.name), d['out_file_specs']))
 
     return launch.LaunchProfile(**d)
 
@@ -167,8 +168,10 @@ def load_prog_spec(file):
         raise UserError(f'{file.name}: args: type mismatch')
 
     d['stdout'] = list(map(functools.partial(get_outputspec, fname=file.name), d['stdout']))
-    d['out_file_specs'] = list(map(functools.partial(get_outfilespec, fname=file.name), d['out_file_specs']))
-    d['in_file_specs'] = list(map(functools.partial(get_infilespec, fname=file.name), d['in_file_specs']))
+    d['out_file_specs'] = list(map(functools.partial(
+        get_outfilespec, fname=file.name), d['out_file_specs']))
+    d['in_file_specs'] = list(map(functools.partial(
+        get_infilespec, fname=file.name), d['in_file_specs']))
 
     return launch.ProgSpec(**d)
 
@@ -299,7 +302,7 @@ def genparams(args):
         raise UserError(str(e))
 
     write_launch_specs(args.launch_spec, args.launch_profile.name,
-            args.prog_spec.name, args.executable, generator)
+                       args.prog_spec.name, args.executable, generator)
 
 
 def get_machine(machine_spec):
@@ -329,6 +332,7 @@ def do_launch(scheduler, submitter):
     'q' or 'c', then cancels all jobs if the user asked for it.
     '''
     interrupted = False
+
     def sigint_handler(*args):
         nonlocal interrupted
         interrupted = True
@@ -405,7 +409,7 @@ def run_experiment(args):
             poll_interval=15)
         with scheduler:
             submitter = launch.ThrottlingSubmitter(scheduler, jobspecs,
-                    job_generator)
+                                                   job_generator)
 
             raw_results = do_launch(scheduler, submitter)
 
@@ -422,7 +426,8 @@ def getoutputs(args):
 
     with get_machine(launch_profile.machine) as machine:
         print('Downloading and parsing outputs...', file=sys.stderr)
-        fieldnames, out = launch.parse_outputs(machine, launch_profile, prog_spec, launch_specs, results)
+        fieldnames, out = launch.parse_outputs(
+            machine, launch_profile, prog_spec, launch_specs, results)
 
     print('Writing CSV...', file=sys.stderr)
     dw = csv.DictWriter(args.out, fieldnames)
@@ -490,6 +495,7 @@ def main():
     except KeyboardInterrupt:
         print('Interrupted by user', file=sys.stderr)
         sys.exit(1)
+
 
 if __name__ == '__main__':
     main()

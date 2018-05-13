@@ -219,6 +219,7 @@ class ThrottlingSubmitter(threading.Thread):
     strategy (a generator like schedule_jobs), with retries every
     attempt_interval.
     '''
+
     def __init__(self,
                  scheduler,
                  jobspecs,
@@ -336,8 +337,8 @@ class ThrottlingSubmitter(threading.Thread):
             _logger.error(f'Submit error (will retry): {e}')
             self._do_submit = False
             self._timer_tpe.submit(call_later,
-                self._attempt_interval, self._timer_cancel_evt, self._fire_event,
-                'SUBMIT')
+                                   self._attempt_interval, self._timer_cancel_evt, self._fire_event,
+                                   'SUBMIT')
             return False
 
         _logger.info(f'Job {index} submitted with id {job.jobid}')
