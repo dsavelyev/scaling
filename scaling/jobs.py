@@ -5,6 +5,7 @@ import queue
 import sched
 import threading
 import time
+import weakref
 
 import toolz
 import attr
@@ -132,11 +133,12 @@ class RemoteScheduler:
 
     def _update_job_state(self, jobid, state):
         with self.lock:
-            js = self.jobs[jobid]
-            if state.status in final_states:
+            js = self.jobs[jobid]()
+            if js is None or state.status in final_states:
                 self.jobs.pop(jobid)
 
-        js.state = state
+        if js is not None:
+            js.state = state
 
     def submit_job(self, spec, callback):
         '''
@@ -161,7 +163,7 @@ class RemoteScheduler:
 
         js = Job(jobid, JobState(JobStateType.SUBMITTED, 0), callback)
         with self.lock:
-            self.jobs[jobid] = js
+            self.jobs[jobid] = weakref.ref(js)
 
         return js
 
