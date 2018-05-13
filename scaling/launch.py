@@ -91,6 +91,10 @@ class SpecError(Exception):
 
 
 def gen_launch_specs(site_spec, prog_spec, paramdicts):
+    '''
+    Validates paramdicts against site_spec and prog_spec and generates
+    LaunchSpecs according to the three.
+    '''
     params = {}
     for k, v in site_spec.params.items():
         params[k] = types[v]
@@ -118,7 +122,11 @@ def gen_launch_specs(site_spec, prog_spec, paramdicts):
 
 
 def create_experiment_inputs(machine, launch_profile, launch_specs):
-    exp_dir = machine.mkdtemp(launch_profile.base_dir + '/experiments')
+    '''
+    Creates working directories for the jobs in the experiment described by
+    launch_specs. Also makes sure the output dir exists.
+    '''
+    exp_dir = machine.mkdtemp(launch_profile.base_dir + '/experiment')
     _logger.info(f'Experiment dir is {exp_dir}')
 
     outdir = launch_profile.base_dir + '/out'
@@ -206,6 +214,11 @@ def schedule_jobs(paramdicts, throttles, max_attempt_counts=10):
 
 
 class ThrottlingSubmitter(threading.Thread):
+    '''
+    Responsible for submitting the jobs given in jobspecs according to
+    strategy (a generator like schedule_jobs), with retries every
+    attempt_interval.
+    '''
     def __init__(self,
                  scheduler,
                  jobspecs,
@@ -336,6 +349,10 @@ class ThrottlingSubmitter(threading.Thread):
 
 
 def get_file_from_glob(machine, dirname, glob_pattern):
+    '''
+    Gets the first file from the directory ``dirname`` that matches
+    ``glob_pattern``.
+    '''
     it = machine.list_files(dirname)
     for filename in it:
         if fnmatch.fnmatch(filename, glob_pattern):
@@ -347,6 +364,9 @@ def get_file_from_glob(machine, dirname, glob_pattern):
 # TODO: rewrite
 def parse_outputs(machine, launch_profile, prog_spec, launch_specs,
                   results):
+    '''
+    Downloads and parses program outputs.
+    '''
     def update_result(result, dirname, fname, spec, exact_file=False):
         try:
             _logger.debug(f'Trying to get {dirname}/{fname}')

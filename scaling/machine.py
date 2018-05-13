@@ -59,8 +59,13 @@ class PasswordRequiredException(Exception):
 
 
 class SSHMachine:
+    '''
+    Represents a machine accessible via SSH.
+    '''
     def __init__(self, host, port=22, username=None, pkey=None, password=None,
                  passphrase=None):
+        # FIXME: auth. Currently it's "whatever paramiko feels like doing"
+
         self.client = paramiko.SSHClient()
         self.client.load_system_host_keys()
         self.client.set_missing_host_key_policy(paramiko.WarningPolicy())
@@ -124,7 +129,7 @@ class SSHMachine:
                 _logger.debug(f'out {out}, err {err}, exitcode {exitcode}')
                 return out, err, exitcode
 
-    # FIXME: newline handling
+    # FIXME: \r\n to \n conversion
 
     def get_file(self, path, text=True):
         with self.lock:
@@ -159,6 +164,7 @@ class SSHMachine:
                     raise FileExistsError
                 return True
 
+    # FIXME: portability
     def mkdtemp(self, prefix):
         _logger.debug(f'mkdtemp {prefix}')
         out, _, exitcode = self.run_command(

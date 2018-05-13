@@ -315,16 +315,20 @@ def genparams(args):
 
 
 def get_machine(machine_spec):
-    password = None
+    '''
+    Creates an SSHMachine from ``machine_spec``, asking for a passphrase if
+    needed.
+    '''
+    passphrase = None
 
     while True:
         try:
             machine = SSHMachine(host=machine_spec.host,
                                  port=machine_spec.port,
                                  username=machine_spec.username,
-                                 passphrase=password)
+                                 passphrase=passphrase)
         except PasswordRequiredException as e:
-            password = getpass.getpass('Private key passphrase: ')
+            passphrase = getpass.getpass('Private key passphrase: ')
         else:
             break
 
@@ -332,6 +336,10 @@ def get_machine(machine_spec):
 
 
 def do_launch(scheduler, submitter):
+    '''
+    Launches the submitter, waits for it to complete or for the user to press
+    'q' or 'c', then cancels all jobs if the user asked for it.
+    '''
     interrupted = False
     def sigint_handler(*args):
         nonlocal interrupted

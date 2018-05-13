@@ -33,6 +33,13 @@ class GrokError(Exception):
 
 
 class Grok:
+    '''
+    Implements regular expressions extended with a syntax inspired by
+    Logstash's Grok plugin: %{PATTERN:name} becomes (?P<name>pattern). A
+    literal percent character needs to be escaped like so: %%. See
+    ``_patterns`` for the supported patterns.
+    '''
+
     @staticmethod
     def parse_grok_pat(p, pat_dict, re_escape=False):
         pat_ref = io.StringIO()
@@ -64,16 +71,20 @@ class Grok:
 
         maybe_escape = regex.escape if re_escape else lambda x: x
 
+        # 'read_char': ('written_char', NEW_STATE)
         INIT, PERCENT, PAT_REF = range(3)
         transducer = (
+            # INIT:
             {
                 '%': ('', PERCENT),
                 None: lambda c: (maybe_escape(c), INIT)
             },
+            # PERCENT:
             {
                 '%': (maybe_escape('%'), INIT),
                 '{': ('', PAT_REF),
             },
+            # PAT_REF:
             {
                 '}': parse_pat_ref,
                 None: add_to_pat_ref

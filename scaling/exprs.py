@@ -10,6 +10,7 @@ from toposort import toposort_flatten
 
 from .functions import builtin_funcs, FunctionError
 
+# AST definitions
 BinOp = namedtuple('BinOp', ['lhs', 'op', 'rhs'])
 UnOp = namedtuple('UnOp', ['op', 'inner'])
 FuncCall = namedtuple('FuncCall', ['funcname', 'args'])
@@ -223,7 +224,7 @@ def _is_iter(x):
 
 def eval_expr(names, expr, expr_vars):
     '''
-    Evaluates an expression.
+    Evaluates an expression in the form of an AST.
     '''
     ret = _real_eval_expr(expr, expr_vars)
 

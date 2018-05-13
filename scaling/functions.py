@@ -97,6 +97,10 @@ def our_range(*args):
 
 
 def reraise_exc(func):
+    '''
+    Returns a wrapper for ``func`` that re-raises any exception as a
+    FunctionError.
+    '''
     def inner(*args, **kwargs):
         try:
             return func(*args, **kwargs)

@@ -31,14 +31,14 @@ final_states = (JobStateType.COMPLETED, JobStateType.CANCELLED,
 
 @attr.s(frozen=True)
 class JobSpec:
-    args = attr.ib()
-    site_args = attr.ib()
+    args = attr.ib()       # array of arguments to the program
+    site_args = attr.ib()  # array of arguments to the start script
     cwd = attr.ib()
 
 
 @attr.s(frozen=True)
 class JobState:
-    status = attr.ib()
+    status = attr.ib()      # JobStateType
     exit_code = attr.ib()
 
 
@@ -72,6 +72,11 @@ class SchedulerError(Exception):
 
 
 class RemoteScheduler:
+    '''
+    Represents a remote job scheduler accessible via ``machine`` and the three
+    ``_cmd`` commands. ``param_spec`` is an array specifying the order of
+    parameters to the start script.
+    '''
     def __init__(self,
                  machine,
                  start_cmd,
@@ -134,6 +139,10 @@ class RemoteScheduler:
         js.state = state
 
     def submit_job(self, spec, callback):
+        '''
+        Submits a job. ``callback`` will be called on the ``Scheduler``'s own
+        thread whenever the state of this job changes.
+        '''
         self._raise_if_closed()
 
         final_args = [self.start_cmd, spec.cwd, self.outdir]
@@ -165,6 +174,9 @@ class RemoteScheduler:
                                    JobState(JobStateType.FAIL_EXTERNAL, 0))
 
     def _poll_cb(self):
+        '''
+        Called every ``poll_interval`` seconds to poll the job queue.
+        '''
         with self.lock:
             if not self.jobs:
                 return
@@ -201,9 +213,13 @@ class RemoteScheduler:
 
         missing_jobids = jobids - polled_jobids
         for jobid in missing_jobids:
+            # deduce its state:
             try:
+                # 1. if the exitcode file exists, the job terminated with an
+                # exit code
                 exit_code = int(self.machine.get_file(f'{self.outdir}/{jobid}.exitcode'))
             except FileNotFoundError:
+                # 2. elif it's in cancelled, it's been cancelled
                 with self.cancel_lock:
                     cancelled = jobid in self.cancelled
                     if cancelled:
@@ -213,6 +229,8 @@ class RemoteScheduler:
                     self._update_job_state(jobid, JobState(JobStateType.CANCELLED, 0))
                     continue
 
+                # 3. else we give it a grace period of ``max_polls_no_job``
+                # before considering it FAIL_EXTERNAL
                 if jobid not in self.ticks:
                     self.ticks[jobid] = 1
                 else:
