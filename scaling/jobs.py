@@ -38,6 +38,11 @@ class JobState:
     status = attr.ib()      # JobStateType
     exit_code = attr.ib()
 
+    def __str__(self):
+        return f'{self.status.name}' +\
+            (f' with exit code {self.exit_code}' if self.status == JobStateType.FAIL_EXIT_CODE
+             else '')
+
 
 class Job:
     def __init__(self, jobid, state, callback):
