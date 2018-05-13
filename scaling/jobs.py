@@ -184,8 +184,9 @@ class RemoteScheduler:
         with self.lock:
             if not self.jobs:
                 return
-            jobids = self.jobs.keys()
-            stdin = RemoteScheduler._serialize_jobids(self.jobs)
+            jobids = set(self.jobs.keys())
+
+        stdin = RemoteScheduler._serialize_jobids(jobids)
 
         poll_args = [self.poll_cmd]
         out, err, exitcode = self.machine.run_command(poll_args, stdin)
