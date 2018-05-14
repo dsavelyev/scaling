@@ -4,11 +4,13 @@ STATUSDIR="$HOME/.scaling-status"
 
 while read -r jobid; do
     FILE="$STATUSDIR/$jobid.status"
-    [ ! -f "$FILE" ] && echo -n "SUBMITTED|0"  # FIXME
-
-    IFS='|'
-    read -r state exitcode < "$FILE"
-    if [ "$state" != "NONE" ]; then
-        echo "$jobid|$state|$exitcode"
+    if [ ! -f "$FILE" ]; then
+        echo "$jobid|SUBMITTED|0"  # FIXME
+    else
+        IFS='|'
+        read -r state exitcode < "$FILE"
+        if [ "$state" != "NONE" ]; then
+            echo "$jobid|$state|$exitcode"
+        fi
     fi
 done
