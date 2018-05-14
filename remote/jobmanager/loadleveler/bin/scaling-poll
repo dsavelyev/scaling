@@ -3,9 +3,12 @@
 STATUSDIR="$HOME/.scaling-status"
 
 while read -r jobid; do
-    echo -n "$jobid|"
     FILE="$STATUSDIR/$jobid.status"
     [ ! -f "$FILE" ] && echo -n "SUBMITTED|0"  # FIXME
-    cat "$FILE" 2>/dev/null
-    echo
+
+    IFS='|'
+    read -r state exitcode < "$FILE"
+    if [ "$state" != "NONE" ]; then
+        echo "$jobid|$state|$exitcode"
+    fi
 done

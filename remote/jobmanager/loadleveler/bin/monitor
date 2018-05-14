@@ -29,8 +29,12 @@ if ($status eq "JOB_COMPLETED") {
     $mystatus = "RUNNING";
 } elsif ($status eq "JOB_VACATED" || $status eq "JOB_REJECTED") {
     $mystatus = "SUBMITTED";
-} elsif ($status eq "JOB_REMOVED" || $status eq "JOB_NOTRUN") {
+} elsif ($status eq "JOB_NOTRUN") {
     $mystatus = "FAIL_EXTERNAL";
+} elsif ($status eq "JOB_REMOVED") {
+    # ambiguous! did we cancel it, or did it die?
+    $mystatus = "NONE";  # tell scaling-poll not to output this one
+    # then the client will decide
 } else {
     $mystatus = "UNKNOWN";
 }
