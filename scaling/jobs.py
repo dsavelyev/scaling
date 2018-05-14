@@ -5,14 +5,14 @@ import weakref
 
 import toolz
 import attr
-from .util import RepeatingTimerThread, OrderedEnum, param_to_string
+from .util import RepeatingTimerThread, param_to_string
 
 
 _logger = logging.getLogger(__name__)
 
 
 @enum.unique
-class JobStateType(OrderedEnum):
+class JobStateType(enum.Enum):
     SUBMITTED = 0
     RUNNING = 1
     COMPLETED = 2
