@@ -14,45 +14,6 @@ import paramiko
 _logger = logging.getLogger(__name__)
 
 
-class LocalMachine:
-    def run_command(self, args, stdin=b''):
-        result = subprocess.run(
-            args, stdin, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        return (result.stdout, result.stderr, result.returncode)
-
-    def get_file(self, path, text=True):
-        mode = 'r' if text else 'rb'
-        with open(path, mode) as f:
-            return f.read()
-
-    def put_file(self, path, data):
-        if isinstance(data, str):
-            mode = 'w'
-        elif isinstance(data, bytes):
-            mode = 'wb'
-        else:
-            raise TypeError('expected str or bytes')
-
-        with open(path, mode) as f:
-            f.write(data)
-
-    def mkdir(self, path):
-        if not os.path.exists(path):
-            os.mkdir(path, 0o755)
-            return False
-        elif not os.path.isdir(path):
-            raise FileExistsError
-        else:
-            return True
-
-    def mkdtemp(self, prefix):
-        dirname, basename = os.path.split(prefix)
-        return tempfile.mkdtemp(dir=dirname, prefix=basename)
-
-    def list_files(self, dirname):
-        raise NotImplementedError
-
-
 class PasswordRequiredException(Exception):
     pass
 
