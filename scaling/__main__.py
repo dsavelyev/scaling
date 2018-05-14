@@ -346,7 +346,7 @@ def do_launch(scheduler, submitter):
                   'jobs', file=sys.stderr)
 
             while submitter.is_alive():
-                key = poll_keyboard()
+                key = poll_keyboard((b'c', b'q'))
                 if interrupted or key in (b'c', b'q'):
                     print('Stopping', file=sys.stderr)
                     submitter.stop()

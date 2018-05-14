@@ -73,12 +73,15 @@ class _stdin_noecho_unix:
 if unix:
     stdin_noecho = _stdin_noecho_unix
 
-    def poll_keyboard():
-        ready, _, _ = select.select([0], [], [], 0)
-        if 0 in ready:
-            return sys.stdin.buffer.read(1)
-        else:
-            return None
+    def poll_keyboard(which_chars):
+        while True:
+            ready, _, _ = select.select([0], [], [], 0)
+            if 0 in ready:
+                ch = sys.stdin.buffer.read(1)
+                if ch in which_chars:
+                    return ch
+            else:
+                break
 else:
     class stdin_noecho:
         def __enter__(self):
@@ -87,15 +90,14 @@ else:
         def __exit__(self, *args):
             pass
 
-    def poll_keyboard():
-        if kbhit():
+    def poll_keyboard(which_chars):
+        while kbhit():
             ch = getch()
             if ch in (b'\000', b'\xe0'):
                 getch()
-                return None
-            return ch
-        else:
-            return None
+            elif ch in which_chars:
+                return ch
+        return None
 
 
 class handle_sigint:
