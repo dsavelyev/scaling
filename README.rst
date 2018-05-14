@@ -86,6 +86,24 @@ remote/jobmanager/loadleveler/src, и поместить ее в *dir*/bin.
   - regex - регулярное выражение (о синтаксисе ниже),
   - vartypes - таблица типов переменных.
 
+::
+
+    [[out_file_specs]]
+    name = "somefile*"
+
+        [[out_file_specs.outputspecs]]
+        regex = "t1=%{FLOAT:time1} t2=%{FLOAT:time2}"
+
+            [[out_file_specs.outputspecs.vartypes]]
+            time1 = "float"
+            time2 = "float"
+
+        [[out_file_specs.outputspecs]]
+        ...
+
+     [[out_file_specs]]
+     ...
+
 Конфигурация программы
 ----------------------
 - args - массив аргументов командной строки с подстановками вида $VAR, где VAR
