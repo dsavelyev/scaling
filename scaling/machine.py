@@ -138,9 +138,7 @@ class SSHMachine:
         with self.lock:
             self._raise_if_closed()
 
-            it = self.sftp_client.listdir_iter(dirname)
-            for entry in it:
-                yield entry.filename
+            return [entry.filename for entry in self.sftp_client.listdir_attr(dirname)]
 
     def close(self):
         self._raise_if_closed()

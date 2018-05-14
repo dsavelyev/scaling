@@ -250,8 +250,8 @@ _jobstate_schema = {
 def get_job_state(obj, fname):
     _validate_schema(obj, _jobstate_schema, fname)
 
-    status = launch.JobStateType[obj['status']]
-    return launch.JobState(status, obj['exit_code'])
+    status = jobs.JobStateType[obj['status']]
+    return jobs.JobState(status, obj['exit_code'])
 
 
 _result_schema = {
