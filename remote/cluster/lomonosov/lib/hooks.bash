@@ -11,8 +11,6 @@ pre_submit_hook() {
     shift
     local PARTITION="$1"
     shift
-    local TIME_LIMIT="$1"
-    shift
     local NTASKS="$1"
     shift
     local NTASKS_PER_NODE="$1"
@@ -23,7 +21,7 @@ pre_submit_hook() {
     read -ra MODULE_ARRAY <<< "$MODULES"
     module add "${MODULE_ARRAY[@]}" || return 2
 
-    SBATCH_ARGS=("-p" "$PARTITION" "-n" "$NTASKS" "--ntasks-per-node" "$NTASKS_PER_NODE" "-t" "$TIME_LIMIT")
+    SBATCH_ARGS=("-p" "$PARTITION" "-n" "$NTASKS" "--ntasks-per-node" "$NTASKS_PER_NODE")
 
     case $TYPE in
         ompi)
